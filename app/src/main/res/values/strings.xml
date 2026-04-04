@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Spendora</string>
+    <!-- Replace this with your actual Web Client ID from Firebase Console -->
+    <string name="default_web_client_id">270487130360-9ugems02aom2rnbrn3darcgfgp6s7jd5.apps.googleusercontent.com</string>
+</resources>
