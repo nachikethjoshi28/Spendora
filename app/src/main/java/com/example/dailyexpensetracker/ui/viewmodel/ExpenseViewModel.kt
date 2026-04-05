@@ -36,34 +36,42 @@ class ExpenseViewModel(
     init {
         viewModelScope.launch {
             repository.initializeDefaultCategories()
-            // Auto sync on start if user is logged in
-            if (Firebase.auth.currentUser != null) {
-                repository.syncAllDataFromCloud()
-            }
         }
     }
 
-    val transactions: StateFlow<List<TransactionEntity>> = repository.allTransactions
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val transactions: StateFlow<List<TransactionEntity>> = _currentUid
+        .flatMapLatest { uid ->
+            if (uid != null) repository.getTransactionsFlow(uid)
+            else flowOf(emptyList())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val transactionsWithHistory: StateFlow<List<TransactionEntity>> = repository.allTransactionsWithHistory
+    val transactionsWithHistory: StateFlow<List<TransactionEntity>> = transactions
+        .map { list -> list.sortedByDescending { it.spentAt } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val categories = repository.allCategories
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val categories: StateFlow<List<CategoryEntity>> = _currentUid
+        .flatMapLatest { uid ->
+            if (uid != null) repository.getCategoriesFlow(uid)
+            else flowOf(emptyList())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val subCategoriesMap = repository.allSubCategories
-        .map { list -> list.associateBy { it.id } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
-    val accounts: StateFlow<List<AccountEntity>> = repository.allAccounts
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val accounts: StateFlow<List<AccountEntity>> = _currentUid
+        .flatMapLatest { uid ->
+            if (uid != null) repository.getAccountsFlow(uid)
+            else flowOf(emptyList())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val profileState: StateFlow<ProfileUiState> = _currentUid
         .flatMapLatest { uid ->
             if (uid != null) {
-                repository.getUserProfile(uid).map { user ->
+                repository.getUserProfileFlow(uid).map { user ->
                     if (user == null) {
                         ProfileUiState.NotRegistered
                     } else if (user.registered || !user.username.isNullOrEmpty()) {
@@ -76,14 +84,8 @@ class ExpenseViewModel(
                 flowOf(ProfileUiState.LoggedOut)
             }
         }
-        .onEach { state ->
-             if (state is ProfileUiState.Success) {
-                 repository.syncAllDataFromCloud()
-             }
-        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileUiState.Loading)
 
-    // Helper for legacy code that still uses userProfile
     val userProfile: StateFlow<UserEntity?> = profileState.map { 
         if (it is ProfileUiState.Success) it.user else null 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -98,10 +100,27 @@ class ExpenseViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val friendBalances: StateFlow<List<FriendBalance>> = repository.friendBalances
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val friendBalances: StateFlow<List<FriendBalance>> = transactions.map { list ->
+        list.filter { it.status != "DELETED" && !it.friendName.isNullOrBlank() }
+            .groupBy { it.friendName!! }
+            .map { (name, txs) ->
+                val balance = txs.sumOf {
+                    when (it.type) {
+                        "LENT" -> it.amount
+                        "BORROWED" -> -it.amount
+                        "RECEIVED" -> -it.amount
+                        "REPAID" -> it.amount
+                        "EXPENSE" -> if (it.isSplit) it.splitAmount else 0.0
+                        else -> 0.0
+                    }
+                }
+                FriendBalance(name, balance)
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun getFriendBalance(friendName: String): Flow<Double?> = repository.getFriendBalance(friendName)
+    fun getFriendBalance(friendName: String): Flow<Double?> = friendBalances.map { list ->
+        list.find { it.friendName.equals(friendName, ignoreCase = true) }?.balance
+    }
 
     val summary: StateFlow<SummaryUiState> =
         transactions.map { list ->
@@ -109,20 +128,22 @@ class ExpenseViewModel(
             val currentMonth = cal.get(Calendar.MONTH)
             val currentYear = cal.get(Calendar.YEAR)
 
-            val currentMonthTransactions = list.filter {
+            val activeTxs = list.filter { it.status != "DELETED" }
+
+            val currentMonthTransactions = activeTxs.filter {
                 cal.timeInMillis = it.spentAt
                 cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear
             }
 
             val income = currentMonthTransactions.filter { 
-                it.type in listOf("SALARY", "RECEIVED", "REPAID") 
+                it.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT") 
             }.sumOf { it.amount }
 
             val expense = currentMonthTransactions.filter { 
-                it.type == "EXPENSE" 
+                it.type in listOf("EXPENSE", "OTHER")
             }.sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
 
-            val dues = list.sumOf {
+            val dues = activeTxs.sumOf {
                 when (it.type) {
                     "LENT" -> it.amount
                     "BORROWED" -> -it.amount
@@ -137,18 +158,12 @@ class ExpenseViewModel(
                 salary = income,
                 expense = expense,
                 netLentBorrowed = dues,
-                balance = income - expense // Local monthly balance
+                balance = income - expense
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SummaryUiState())
 
     fun setUid(uid: String?) {
-        val changed = _currentUid.value != uid
         _currentUid.value = uid
-        if (changed && uid != null) {
-            viewModelScope.launch {
-                repository.syncAllDataFromCloud()
-            }
-        }
     }
 
     fun selectCategory(categoryId: String?) {
@@ -204,15 +219,16 @@ class ExpenseViewModel(
     }
 
     fun getTransactionsByAccount(accountId: String): Flow<List<TransactionEntity>> =
-        repository.getTransactionsByAccount(accountId)
+        transactions.map { list -> list.filter { it.accountId == accountId || it.toAccountId == accountId } }
 
     fun getTransactionsByFriend(friendName: String): Flow<List<TransactionEntity>> =
-        repository.getTransactionsByFriend(friendName)
+        transactions.map { list -> list.filter { it.friendName?.equals(friendName, ignoreCase = true) == true } }
 
     fun signIn(uid: String, email: String, displayName: String?) {
         viewModelScope.launch {
             repository.saveUserProfile(UserEntity(uid = uid, email = email, displayName = displayName))
             setUid(uid)
+            repository.initializeDefaultCategories()
         }
     }
 
@@ -220,7 +236,7 @@ class ExpenseViewModel(
         viewModelScope.launch {
             _currentUid.value?.let { uid ->
                 try {
-                    val profile = repository.getUserProfile(uid).first()
+                    val profile = repository.getUserProfileFlow(uid).first()
                     val updatedProfile = if (profile != null) {
                         profile.copy(username = username, dob = dob, registered = true)
                     } else {
@@ -242,7 +258,7 @@ class ExpenseViewModel(
         viewModelScope.launch {
             _currentUid.value?.let { uid ->
                 try {
-                    val profile = repository.getUserProfile(uid).first()
+                    val profile = repository.getUserProfileFlow(uid).first()
                     if (profile != null) {
                         repository.updateUserProfile(profile.copy(profilePictureUri = uri))
                     }
@@ -270,12 +286,6 @@ class ExpenseViewModel(
         viewModelScope.launch {
             repository.deleteUserAccount()
             setUid(null)
-        }
-    }
-    
-    fun syncNow() {
-        viewModelScope.launch {
-            repository.syncAllDataFromCloud()
         }
     }
 }

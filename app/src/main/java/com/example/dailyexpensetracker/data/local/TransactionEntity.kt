@@ -3,8 +3,11 @@ package com.example.dailyexpensetracker.data.local
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.google.firebase.firestore.IgnoreExtraProperties
+import com.google.firebase.firestore.PropertyName
 import java.util.UUID
 
+@IgnoreExtraProperties
 @Entity(
     tableName = "transactions",
     indices = [
@@ -16,23 +19,26 @@ import java.util.UUID
     ]
 )
 data class TransactionEntity(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val amount: Double = 0.0,
-    val type: String = "EXPENSE", // EXPENSE, SALARY, LENT, BORROWED, RECEIVED, REPAID, SELF_TRANSFER
-    val categoryId: String? = null,
-    val subCategoryId: String? = null,
-    val accountId: String? = null,
-    val toAccountId: String? = null, // For SELF_TRANSFER
-    val paymentMode: String? = null,
-    val friendName: String? = null,
-    val friendContact: String? = null,
-    val note: String? = null,
-    val status: String = "ACTIVE", // ACTIVE, DELETED, EDITED
-    val isSplit: Boolean = false,
-    val splitAmount: Double = 0.0,
-    val splitType: String? = null, // EQUAL, PERCENTAGE, AMOUNT
-    val splitRatio: String? = null, // e.g., "50-50", "70-30" or "65-85"
-    val spentAt: Long = System.currentTimeMillis(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    @PrimaryKey var id: String = UUID.randomUUID().toString(),
+    var amount: Double = 0.0,
+    var type: String = "EXPENSE", // EXPENSE, SALARY, LENT, BORROWED, RECEIVED, REPAID, SELF_TRANSFER
+    var categoryId: String? = null,
+    var subCategoryId: String? = null,
+    var accountId: String? = null,
+    var toAccountId: String? = null, // For SELF_TRANSFER
+    var paymentMode: String? = null,
+    var friendName: String? = null,
+    var friendContact: String? = null,
+    var note: String? = null,
+    var status: String = "ACTIVE", // ACTIVE, DELETED, EDITED
+    
+    @get:PropertyName("split") @set:PropertyName("split")
+    var isSplit: Boolean = false,
+    
+    var splitAmount: Double = 0.0,
+    var splitType: String? = null, // EQUAL, PERCENTAGE, AMOUNT
+    var splitRatio: String? = null, // e.g., "50-50", "70-30" or "65-85"
+    var spentAt: Long = System.currentTimeMillis(),
+    var createdAt: Long = System.currentTimeMillis(),
+    var updatedAt: Long = System.currentTimeMillis()
 )

@@ -1115,13 +1115,17 @@ fun TransactionItem(transaction: TransactionEntity, categoryName: String, accoun
                     if (!isTransfer) DetailRow("Category", categoryName)
                     DetailRow(if (isTransfer) "From Account" else "Account", accountName)
                     
-                    if (transaction.friendName != null) DetailRow("Friend", transaction.friendName)
+                    transaction.friendName?.let { friendName ->
+                        DetailRow("Friend", friendName)
+                    }
                     if (transaction.isSplit) DetailRow("Friend's Share", "$${"%.2f".format(transaction.splitAmount)}")
                     
-                    if (!transaction.note.isNullOrBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text("Note", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Text(transaction.note, color = Color.White, fontSize = 14.sp)
+                    transaction.note?.let { note ->
+                        if (note.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Note", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(note, color = Color.White, fontSize = 14.sp)
+                        }
                     }
                 }
             }
