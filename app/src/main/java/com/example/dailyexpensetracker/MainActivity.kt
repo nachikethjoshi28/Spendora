@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val db = AppDatabase.getDatabase(applicationContext)
-        val repository = ExpenseRepository(db.transactionDao(), db.categoryDao(), db.accountDao(), db.userDao())
+        val repository = ExpenseRepository(db.transactionDao(), db.categoryDao(), db.accountDao())
 
         setContent {
             SpendoraTheme {

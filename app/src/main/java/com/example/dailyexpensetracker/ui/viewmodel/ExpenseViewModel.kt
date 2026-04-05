@@ -1,5 +1,6 @@
 package com.example.dailyexpensetracker.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -63,13 +64,22 @@ class ExpenseViewModel(
         .flatMapLatest { uid ->
             if (uid != null) {
                 repository.getUserProfile(uid).map { user ->
-                    if (user == null) ProfileUiState.NotRegistered
-                    else if (!user.isRegistered) ProfileUiState.NotRegistered
-                    else ProfileUiState.Success(user)
+                    if (user == null) {
+                        ProfileUiState.NotRegistered
+                    } else if (user.registered || !user.username.isNullOrEmpty()) {
+                        ProfileUiState.Success(user)
+                    } else {
+                        ProfileUiState.NotRegistered
+                    }
                 }
             } else {
                 flowOf(ProfileUiState.LoggedOut)
             }
+        }
+        .onEach { state ->
+             if (state is ProfileUiState.Success) {
+                 repository.syncAllDataFromCloud()
+             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileUiState.Loading)
 
@@ -209,9 +219,16 @@ class ExpenseViewModel(
     fun completeRegistration(username: String, dob: Long) {
         viewModelScope.launch {
             _currentUid.value?.let { uid ->
-                val profile = repository.getUserProfile(uid).firstOrNull()
-                if (profile != null) {
-                    repository.updateUserProfile(profile.copy(username = username, dob = dob, isRegistered = true))
+                try {
+                    val profile = repository.getUserProfile(uid).first()
+                    val updatedProfile = if (profile != null) {
+                        profile.copy(username = username, dob = dob, registered = true)
+                    } else {
+                        UserEntity(uid = uid, username = username, dob = dob, registered = true)
+                    }
+                    repository.updateUserProfile(updatedProfile)
+                } catch (e: Exception) {
+                    Log.e("ExpenseViewModel", "Error completing registration", e)
                 }
             }
         }
@@ -224,9 +241,13 @@ class ExpenseViewModel(
     fun updateProfilePicture(uri: String) {
         viewModelScope.launch {
             _currentUid.value?.let { uid ->
-                val profile = repository.getUserProfile(uid).firstOrNull()
-                if (profile != null) {
-                    repository.updateUserProfile(profile.copy(profilePictureUri = uri))
+                try {
+                    val profile = repository.getUserProfile(uid).first()
+                    if (profile != null) {
+                        repository.updateUserProfile(profile.copy(profilePictureUri = uri))
+                    }
+                } catch (e: Exception) {
+                    Log.e("ExpenseViewModel", "Error updating profile picture", e)
                 }
             }
         }

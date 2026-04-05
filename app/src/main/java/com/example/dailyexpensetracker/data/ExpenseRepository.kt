@@ -6,17 +6,17 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class ExpenseRepository(
     private val transactionDao: TransactionDao,
     private val categoryDao: CategoryDao,
-    private val accountDao: AccountDao,
-    private val userDao: UserDao
+    private val accountDao: AccountDao
 ) {
     private val firestore = Firebase.firestore
     private val auth = Firebase.auth
@@ -32,8 +32,18 @@ class ExpenseRepository(
     val allSubCategories = categoryDao.getAllSubCategories()
     val allAccounts = accountDao.getAllAccounts()
 
-    fun getUserProfile(uid: String) = userDao.getUserProfile(uid)
-    suspend fun getUserByUid(uid: String) = userDao.getUserByUid(uid)
+    fun getUserProfile(uid: String): Flow<UserEntity?> = callbackFlow {
+        val docRef = firestore.collection("users").document(uid)
+        val listener = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            val user = snapshot?.toObject(UserEntity::class.java)
+            trySend(user)
+        }
+        awaitClose { listener.remove() }
+    }
 
     suspend fun initializeDefaultCategories() {
         val defaults = listOf("Friend", "Shopping", "Rent", "Groceries", "Food", "Travel")
@@ -119,22 +129,7 @@ class ExpenseRepository(
         try {
             withTimeout(120000) { 
                 coroutineScope {
-                    launch {
-                        try {
-                            val userDoc = firestore.collection("users").document(uid).get().await()
-                            if (userDoc.exists()) {
-                                val cloudUser = userDoc.toObject(UserEntity::class.java)
-                                if (cloudUser != null) {
-                                    val localUser = userDao.getUserByUid(uid)
-                                    if (localUser == null || (!localUser.isRegistered && cloudUser.isRegistered)) {
-                                        userDao.insertUser(cloudUser)
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.e("ExpenseRepository", "Failed to sync user profile", e)
-                        }
-                    }
+                    // We no longer sync user profile to local Room as we fetch it directly from Firestore now.
 
                     launch {
                         try {
@@ -163,7 +158,6 @@ class ExpenseRepository(
                                 if (local == null) {
                                     accountDao.insertAccount(acc)
                                 } else {
-                                    // Update local only if cloud data is actually different/needed
                                     accountDao.insertAccount(acc)
                                 }
                             }
@@ -252,7 +246,6 @@ class ExpenseRepository(
 
     suspend fun deleteAccount(account: AccountEntity) {
         accountDao.deleteAccount(account)
-        // Optionally delete from cloud in background
         repositoryScope.launch {
             val uid = auth.currentUser?.uid ?: return@launch
             firestore.collection("users").document(uid)
@@ -263,40 +256,20 @@ class ExpenseRepository(
 
     suspend fun saveUserProfile(user: UserEntity) {
         try {
-            // Check local first
-            val local = userDao.getUserByUid(user.uid)
-            if (local != null && local.isRegistered) return
-
-            // Check Firestore once
             val doc = firestore.collection("users").document(user.uid).get().await()
-            if (doc.exists()) {
-                val cloudUser = doc.toObject(UserEntity::class.java)
-                if (cloudUser != null) {
-                    userDao.insertUser(cloudUser)
-                    return
-                }
-            }
-            
-            // If completely new
-            if (local == null) {
-                userDao.insertUser(user)
+            if (!doc.exists()) {
+                firestore.collection("users").document(user.uid).set(user).await()
             }
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to save/restore user profile", e)
-            if (userDao.getUserByUid(user.uid) == null) {
-                userDao.insertUser(user)
-            }
+            Log.e("ExpenseRepository", "Failed to save user profile to Firestore", e)
         }
     }
 
     suspend fun updateUserProfile(user: UserEntity) {
         try {
-            userDao.insertUser(user)
-            repositoryScope.launch {
-                firestore.collection("users").document(user.uid).set(user).await()
-            }
+            firestore.collection("users").document(user.uid).set(user).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to update user profile", e)
+            Log.e("ExpenseRepository", "Failed to update user profile in Firestore", e)
         }
     }
 
@@ -320,18 +293,16 @@ class ExpenseRepository(
     suspend fun clearAllData() {
         transactionDao.deleteAllTransactions()
         accountDao.deleteAllAccounts()
-        userDao.clearAllUsers()
     }
 
     suspend fun deleteUserAccount() {
         val user = auth.currentUser
         val uid = user?.uid
         try {
-            user?.delete()?.await()
             if (uid != null) {
-                userDao.deleteUserByUid(uid)
                 firestore.collection("users").document(uid).delete().await()
             }
+            user?.delete()?.await()
         } catch (e: Exception) {
             Log.e("ExpenseRepository", "Failed to delete user account fully", e)
         }
