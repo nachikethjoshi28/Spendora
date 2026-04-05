@@ -158,7 +158,7 @@ fun ExpenseTrackerScreen(viewModel: ExpenseViewModel) {
                         snackbarHostState = snackbarHostState
                     )
                     3 -> LentBorrowedTab(viewModel, onEditTransaction = { editingTransaction = it })
-                    4 -> ProfileTab(viewModel)
+                    4 -> ProfileTab(viewModel, onEditTransaction = { editingTransaction = it })
                 }
             }
         }

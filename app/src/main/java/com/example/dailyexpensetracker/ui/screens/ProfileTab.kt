@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.example.dailyexpensetracker.data.local.AccountEntity
+import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import com.google.firebase.auth.ktx.auth
@@ -108,7 +109,7 @@ val investmentPortfolios = listOf(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ProfileTab(viewModel: ExpenseViewModel) {
+fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntity) -> Unit) {
     val context = LocalContext.current
     val accounts by viewModel.accounts.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
@@ -132,7 +133,8 @@ fun ProfileTab(viewModel: ExpenseViewModel) {
         AccountHistoryView(
             account = selectedAccountForHistory!!,
             viewModel = viewModel,
-            onBack = { selectedAccountForHistory = null }
+            onBack = { selectedAccountForHistory = null },
+            onEditTransaction = onEditTransaction
         )
     } else if (showAccountsPage) {
         BackHandler { showAccountsPage = false }
@@ -453,12 +455,22 @@ fun AccountsPage(
 fun AccountHistoryView(
     account: AccountEntity,
     viewModel: ExpenseViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEditTransaction: (TransactionEntity) -> Unit
 ) {
-    val transactions by viewModel.transactions.collectAsState()
+    val transactions by viewModel.transactionsWithHistory.collectAsState()
+    val categories by viewModel.categories.collectAsState()
+    val accounts by viewModel.accounts.collectAsState()
+    
+    val categoryMap = categories.associateBy { it.id }
+    val accountMap = accounts.associateBy { it.id }
+
     val accountTransactions = remember(transactions, account.id) {
         transactions.filter { it.accountId == account.id || it.toAccountId == account.id }
+            .sortedByDescending { it.spentAt }
     }
+
+    var showActions by remember { mutableStateOf<TransactionEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -495,40 +507,37 @@ fun AccountHistoryView(
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 items(accountTransactions) { tx ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = FintechSurface),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(tx.type, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text(SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(tx.spentAt)), color = Color.Gray, fontSize = 12.sp)
-                            }
-                            
-                            val isPositive = tx.type in listOf("INCOME", "SALARY", "RECEIVED", "REPAID", "GIFT", "BORROWED")
-                            
-                            val displayAmount = if (tx.toAccountId == account.id) {
-                                tx.amount
-                            } else {
-                                if (isPositive) tx.amount else -tx.amount
-                            }
-
-                            val txPrefix = if (displayAmount < 0) "-" else "+"
-                            Text(
-                                "$txPrefix$${"%.2f".format(abs(displayAmount))}",
-                                color = if (displayAmount >= 0) FintechIncome else FintechExpense,
-                                fontWeight = FontWeight.Black
-                            )
-                        }
-                    }
+                    TransactionItem(
+                        transaction = tx,
+                        categoryName = (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase(),
+                        accountName = accountMap[tx.accountId]?.name ?: "Unknown",
+                        onLongClick = { if (tx.status != "DELETED") showActions = tx }
+                    )
                 }
             }
         }
+    }
+
+    if (showActions != null) {
+        AlertDialog(
+            onDismissRequest = { showActions = null },
+            containerColor = FintechCard,
+            titleContentColor = Color.White,
+            title = { Text("Transaction Options") },
+            text = { Text("What to do with this record?", color = Color.Gray) },
+            confirmButton = { 
+                Button(onClick = { 
+                    onEditTransaction(showActions!!)
+                    showActions = null 
+                }, colors = ButtonDefaults.buttonColors(containerColor = FintechAccent)) { Text("Edit") } 
+            },
+            dismissButton = { 
+                TextButton(onClick = { 
+                    viewModel.deleteTransaction(showActions!!.id)
+                    showActions = null 
+                }) { Text("Delete", color = FintechExpense) } 
+            }
+        )
     }
 }
 
