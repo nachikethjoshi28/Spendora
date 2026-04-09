@@ -309,7 +309,8 @@ class ExpenseViewModel(
         phone: String? = null,
         uid: String? = null,
         username: String? = null,
-        isRegistered: Boolean = false
+        isRegistered: Boolean = false,
+        profilePictureUri: String? = null
     ) {
         viewModelScope.launch {
             val friend = FriendEntity(
@@ -319,7 +320,8 @@ class ExpenseViewModel(
                 nickname = nickname,
                 email = email,
                 phone = phone,
-                isRegistered = isRegistered
+                isRegistered = isRegistered,
+                profilePictureUri = profilePictureUri
             )
             repository.addFriend(friend)
         }

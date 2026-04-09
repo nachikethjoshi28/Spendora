@@ -20,12 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.dailyexpensetracker.data.local.AccountEntity
+import com.example.dailyexpensetracker.data.local.FriendEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.data.local.UserEntity
 import com.example.dailyexpensetracker.ui.screens.*
@@ -43,6 +47,7 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
     var searchQuery by remember { mutableStateOf("") }
     var showFabMenu by remember { mutableStateOf(false) }
     var showAddFriendDialog by remember { mutableStateOf(false) }
+    var showFriendsListDialog by remember { mutableStateOf(false) }
 
     val filteredBalances = remember(friendBalances, searchQuery) {
         if (searchQuery.isBlank()) friendBalances
@@ -58,27 +63,50 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
         if (selectedFriend == null) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Spacer(Modifier.height(16.dp))
-                // Search Bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search friends or add new", color = Color.Gray) },
+                // Search Bar + Friends Icon
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = FintechCard,
-                        unfocusedContainerColor = FintechCard,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        cursorColor = FintechAccent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-                    singleLine = true
-                )
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search friends or add new", color = Color.Gray) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FintechCard,
+                            unfocusedContainerColor = FintechCard,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            cursorColor = FintechAccent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                        singleLine = true
+                    )
+                    
+                    Spacer(Modifier.width(8.dp))
+                    
+                    Surface(
+                        onClick = { showFriendsListDialog = true },
+                        shape = CircleShape,
+                        color = FintechCard,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.People,
+                                contentDescription = "Friends List",
+                                tint = FintechAccent,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -195,6 +223,98 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
             onDismiss = { showAddFriendDialog = false }
         )
     }
+
+    if (showFriendsListDialog) {
+        FriendsListDialog(
+            viewModel = viewModel,
+            onDismiss = { showFriendsListDialog = false }
+        )
+    }
+}
+
+@Composable
+fun FriendsListDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
+    val friends by viewModel.friends.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = FintechCard,
+        titleContentColor = Color.White,
+        title = { Text("My Friends", fontWeight = FontWeight.Bold) },
+        text = {
+            if (friends.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                    Text("No friends added yet", color = Color.Gray)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(friends) { friend ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                modifier = Modifier.size(44.dp),
+                                color = Color.DarkGray
+                            ) {
+                                if (!friend.profilePictureUri.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(friend.profilePictureUri)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Person, 
+                                        contentDescription = null, 
+                                        tint = Color.LightGray, 
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+                            
+                            Spacer(Modifier.width(12.dp))
+                            
+                            Column {
+                                Text(
+                                    text = friend.nickname, 
+                                    color = Color.White, 
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                                if (!friend.username.isNullOrEmpty()) {
+                                    Text(
+                                        text = "@${friend.username}", 
+                                        color = Color.Gray, 
+                                        fontSize = 12.sp
+                                    )
+                                } else if (!friend.email.isNullOrEmpty()) {
+                                    Text(
+                                        text = friend.email!!, 
+                                        color = Color.Gray, 
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = FintechAccent, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable
@@ -301,7 +421,8 @@ fun AddFriendDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
                             phone = if (contact.all { it.isDigit() || it == '+' }) contact else foundUser?.phone,
                             uid = foundUser?.uid,
                             username = foundUser?.username,
-                            isRegistered = foundUser != null
+                            isRegistered = foundUser != null,
+                            profilePictureUri = foundUser?.profilePictureUri
                         )
                         onDismiss()
                     }

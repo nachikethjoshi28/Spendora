@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         AccountEntity::class,
         FriendEntity::class
     ],
-    version = 18,
+    version = 24,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -30,6 +30,9 @@ data class FriendEntity(
     @get:PropertyName("isRegistered") @set:PropertyName("isRegistered")
     var isRegistered: Boolean = false,
     
+    @get:PropertyName("profilePictureUri") @set:PropertyName("profilePictureUri")
+    var profilePictureUri: String? = null,
+    
     @get:PropertyName("createdAt") @set:PropertyName("createdAt")
     var createdAt: Long = System.currentTimeMillis()
 )
