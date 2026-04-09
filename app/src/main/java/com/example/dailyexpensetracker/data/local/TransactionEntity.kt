@@ -9,7 +9,7 @@ import java.util.UUID
 
 /**
  * Cleaned and optimized Transaction Entity for Room and Firestore alignment.
- * 
+ *
  * Key Fixes:
  * 1. Standardized Booleans: Added @get:PropertyName and @set:PropertyName for 'isSplit' to ensure
  *    Firestore mapping consistency (resolving the Kotlin 'is' prefix serialization issue).

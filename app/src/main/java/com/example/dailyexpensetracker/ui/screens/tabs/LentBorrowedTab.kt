@@ -24,9 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dailyexpensetracker.data.local.AccountEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
-import com.example.dailyexpensetracker.ui.screens.SectionHeader
-import com.example.dailyexpensetracker.ui.screens.TransactionItem
-import com.example.dailyexpensetracker.ui.screens.toSentenceCase
+import com.example.dailyexpensetracker.ui.screens.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import kotlin.math.abs
@@ -39,6 +37,7 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
     var selectedFriend by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var showFabMenu by remember { mutableStateOf(false) }
+    var showAddFriendDialog by remember { mutableStateOf(false) }
 
     val filteredBalances = remember(friendBalances, searchQuery) {
         if (searchQuery.isBlank()) friendBalances
@@ -159,6 +158,11 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                         modifier = Modifier.padding(bottom = 12.dp)
                     ) {
                         Column(modifier = Modifier.padding(8.dp)) {
+                            FabMenuItem(Icons.Default.PersonAdd, "ADD FRIEND") { 
+                                showFabMenu = false
+                                showAddFriendDialog = true
+                            }
+                            HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
                             FabMenuItem(Icons.Default.Group, "CREATE GROUP") { showFabMenu = false }
                             HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
                             FabMenuItem(Icons.Default.MonetizationOn, "ADD EXPENSE") { showFabMenu = false }
@@ -178,6 +182,38 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
         } else {
             FriendHistoryView(selectedFriend!!, viewModel, accountMap, { selectedFriend = null }, onEditTransaction)
         }
+    }
+
+    if (showAddFriendDialog) {
+        var friendName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddFriendDialog = false },
+            containerColor = FintechCard,
+            titleContentColor = Color.White,
+            title = { Text("Add Friend") },
+            text = { 
+                Column {
+                    Text("Enter friend's name to start tracking balances.", color = Color.Gray, fontSize = 14.sp)
+                    Spacer(Modifier.height(16.dp))
+                    FintechInput(value = friendName, label = "Friend Name") { friendName = it }
+                }
+            },
+            confirmButton = { 
+                TextButton(onClick = { 
+                    if (friendName.isNotBlank()) {
+                        selectedFriend = friendName.trim()
+                        showAddFriendDialog = false
+                    }
+                }) { 
+                    Text("Add", color = FintechAccent, fontWeight = FontWeight.Bold) 
+                } 
+            },
+            dismissButton = { 
+                TextButton(onClick = { showAddFriendDialog = false }) { 
+                    Text("Cancel", color = Color.Gray) 
+                } 
+            }
+        )
     }
 }
 
@@ -218,8 +254,14 @@ fun FriendHistoryView(friendName: String, viewModel: ExpenseViewModel, accountMa
             )
         }
         Spacer(Modifier.height(20.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(friendTransactions) { tx -> TransactionItem(tx, (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase(), accountMap[tx.accountId]?.name ?: "Unknown", onLongClick = { if (tx.status != "DELETED") showActions = tx }) }
+        if (friendTransactions.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No transactions with ${friendName.toSentenceCase()}", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(friendTransactions) { tx -> TransactionItem(tx, (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase(), accountMap[tx.accountId]?.name ?: "Unknown", onLongClick = { if (tx.status != "DELETED") showActions = tx }) }
+            }
         }
     }
     if (showActions != null) {
