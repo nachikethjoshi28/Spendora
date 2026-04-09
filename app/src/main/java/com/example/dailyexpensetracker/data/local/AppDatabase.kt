@@ -10,9 +10,10 @@ import androidx.room.RoomDatabase
         TransactionEntity::class, 
         CategoryEntity::class, 
         SubCategoryEntity::class, 
-        AccountEntity::class
+        AccountEntity::class,
+        FriendEntity::class
     ],
-    version = 14,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun categoryDao(): CategoryDao
     abstract fun accountDao(): AccountDao
+    abstract fun friendDao(): FriendDao
 
     companion object {
         @Volatile

@@ -41,6 +41,9 @@ import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.ui.screens.tabs.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
+import com.example.dailyexpensetracker.ui.viewmodel.ProfileUiState
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import com.itextpdf.text.Document
 import com.itextpdf.text.Element
 import com.itextpdf.text.Font
@@ -91,6 +94,60 @@ fun getIconByName(name: String?): ImageVector {
 
 @Composable
 fun ExpenseTrackerScreen(viewModel: ExpenseViewModel) {
+    val profileState by viewModel.profileState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    when (val state = profileState) {
+        is ProfileUiState.LoggedOut -> {
+            LoginScreen(
+                onLoginSuccess = {
+                    // Logic handled by Firebase auth state change if using a listener,
+                    // or manually call viewModel.setUid()
+                    Firebase.auth.currentUser?.let { user ->
+                        viewModel.signIn(user.uid, user.email ?: "", user.displayName)
+                    }
+                },
+                onEmailLogin = { email, pass ->
+                    Firebase.auth.signInWithEmailAndPassword(email, pass)
+                        .addOnSuccessListener { result ->
+                            result.user?.let { viewModel.signIn(it.uid, it.email ?: "", it.displayName) }
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(context, "Login Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                },
+                onEmailSignUp = { email, pass ->
+                    Firebase.auth.createUserWithEmailAndPassword(email, pass)
+                        .addOnSuccessListener { result ->
+                            result.user?.let { viewModel.signIn(it.uid, it.email ?: "", it.displayName) }
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(context, "Sign Up Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                },
+                onPhoneLogin = { /* Phone auth logic */ },
+                onVerifyOtp = { /* OTP verify logic */ }
+            )
+        }
+        is ProfileUiState.NotRegistered -> {
+            RegistrationScreen(viewModel) { username, dob ->
+                viewModel.completeRegistration(username, dob)
+            }
+        }
+        is ProfileUiState.Success -> {
+            MainScaffold(viewModel)
+        }
+        is ProfileUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = FintechAccent)
+            }
+        }
+    }
+}
+
+@Composable
+fun MainScaffold(viewModel: ExpenseViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var editingTransaction by remember { mutableStateOf<TransactionEntity?>(null) }
     

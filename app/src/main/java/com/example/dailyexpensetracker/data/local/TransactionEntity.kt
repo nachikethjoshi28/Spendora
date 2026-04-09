@@ -9,14 +9,6 @@ import java.util.UUID
 
 /**
  * Cleaned and optimized Transaction Entity for Room and Firestore alignment.
- *
- * Key Fixes:
- * 1. Standardized Booleans: Added @get:PropertyName and @set:PropertyName for 'isSplit' to ensure
- *    Firestore mapping consistency (resolving the Kotlin 'is' prefix serialization issue).
- * 2. Optimized Meta-data: Timestamps are initialized once at creation.
- * 3. Standardized Naming: Consistent camelCase usage while ensuring Firestore compatibility.
- * 4. Room/Firebase Alignment: Used @IgnoreExtraProperties to safeguard against Firestore schema shifts.
- * 5. Refined Indexes: Kept only necessary indexes used for active filtering/sorting.
  */
 @IgnoreExtraProperties
 @Entity(
@@ -26,7 +18,8 @@ import java.util.UUID
         Index(value = ["categoryId"]),
         Index(value = ["type"]),
         Index(value = ["spentAt"]),
-        Index(value = ["friendName"])
+        Index(value = ["friendName"]),
+        Index(value = ["friendUid"])
     ]
 )
 data class TransactionEntity(
@@ -53,6 +46,8 @@ data class TransactionEntity(
     
     var friendName: String? = null,
     
+    var friendUid: String? = null,
+    
     var friendContact: String? = null,
     
     var note: String? = null,
@@ -69,5 +64,11 @@ data class TransactionEntity(
     
     var createdAt: Long = System.currentTimeMillis(),
     
-    var updatedAt: Long = System.currentTimeMillis()
+    var updatedAt: Long = System.currentTimeMillis(),
+
+    @get:PropertyName("isSynced")
+    @set:PropertyName("isSynced")
+    var isSynced: Boolean = false,
+
+    var originalTransactionId: String? = null // Reference to the source transaction for syncing deletes/updates
 )

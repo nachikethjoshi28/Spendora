@@ -12,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.UUID
 
 data class SummaryUiState(
     val salary: Double = 0.0,
@@ -63,6 +64,14 @@ class ExpenseViewModel(
     val accounts: StateFlow<List<AccountEntity>> = _currentUid
         .flatMapLatest { uid ->
             if (uid != null) repository.getAccountsFlow(uid)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val friends: StateFlow<List<FriendEntity>> = _currentUid
+        .flatMapLatest { uid ->
+            if (uid != null) repository.getFriendsFlow(uid)
             else flowOf(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -286,6 +295,33 @@ class ExpenseViewModel(
         viewModelScope.launch {
             repository.deleteUserAccount()
             setUid(null)
+        }
+    }
+
+    // Friend Management
+    suspend fun searchFriend(contact: String): UserEntity? {
+        return repository.findUserByContact(contact)
+    }
+
+    fun addFriend(
+        nickname: String,
+        email: String? = null,
+        phone: String? = null,
+        uid: String? = null,
+        username: String? = null,
+        isRegistered: Boolean = false
+    ) {
+        viewModelScope.launch {
+            val friend = FriendEntity(
+                id = UUID.randomUUID().toString(),
+                uid = uid,
+                username = username,
+                nickname = nickname,
+                email = email,
+                phone = phone,
+                isRegistered = isRegistered
+            )
+            repository.addFriend(friend)
         }
     }
 }
