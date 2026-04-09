@@ -28,14 +28,11 @@ class ExpenseRepository(
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ExpenseRepository", "Firestore Transactions Listener Error: ${error.message}")
-                    // Don't close with error to avoid crashing the collector,
-                    // just log it and maybe send an empty list or keep previous state
                     return@addSnapshotListener
                 }
                 val txs = snapshot?.toObjects(TransactionEntity::class.java) ?: emptyList()
                 trySend(txs)
                 
-                // Keep Room as a temporary cache for offline support
                 repositoryScope.launch {
                     txs.forEach { transactionDao.insertTransaction(it) }
                 }
@@ -271,9 +268,14 @@ class ExpenseRepository(
         }
     }
 
-    suspend fun addSubCategory(categoryId: String, name: String) {
+    suspend fun addSubCategory(categoryId: String, name: String, iconName: String = "Category", colorHex: String = "#6200EE") {
         try {
-            categoryDao.insertSubCategory(SubCategoryEntity(categoryId = categoryId, name = name))
+            categoryDao.insertSubCategory(SubCategoryEntity(
+                categoryId = categoryId, 
+                name = name, 
+                iconName = iconName, 
+                colorHex = colorHex
+            ))
         } catch (e: Exception) {
             Log.e("ExpenseRepository", "Failed to add subcategory locally", e)
         }
@@ -357,10 +359,8 @@ class ExpenseRepository(
         transactionDao.deleteAllTransactions()
         accountDao.deleteAllAccounts()
     }
-    
-    suspend fun syncAllDataFromCloud() {
-        // Real-time listeners handle synchronization now
-    }
 
     fun getSubCategories(categoryId: String) = categoryDao.getSubCategoriesByCategory(categoryId)
+
+    fun getAllSubCategories(): Flow<List<SubCategoryEntity>> = categoryDao.getAllSubCategories()
 }

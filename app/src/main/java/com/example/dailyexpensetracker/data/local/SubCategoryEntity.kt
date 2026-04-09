@@ -8,5 +8,7 @@ import java.util.UUID
 data class SubCategoryEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val categoryId: String = "",
-    val name: String = ""
+    val name: String = "",
+    val iconName: String = "Category",
+    val colorHex: String = "#6200EE"
 )

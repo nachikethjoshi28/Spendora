@@ -9,8 +9,12 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.FileProvider
 import com.example.dailyexpensetracker.data.local.AccountEntity
+import com.example.dailyexpensetracker.data.local.CategoryEntity
+import com.example.dailyexpensetracker.data.local.SubCategoryEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
@@ -57,6 +65,34 @@ fun String.toSentenceCase(): String {
     if (this.isBlank()) return this
     val trimmed = this.trim()
     return trimmed.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+}
+
+fun getIconByName(name: String?): ImageVector {
+    if (name == null) return Icons.Default.Category
+    return when (name.lowercase()) {
+        "housing" -> Icons.Default.Home
+        "shopping" -> Icons.Default.ShoppingBag
+        "groceries" -> Icons.Default.ShoppingCart
+        "travel" -> Icons.Default.Flight
+        "rent" -> Icons.Default.Apartment
+        "food" -> Icons.Default.Restaurant
+        "friend" -> Icons.Default.Person
+        "entertainment" -> Icons.Default.Movie
+        "insurance" -> Icons.Default.Shield
+        "health" -> Icons.Default.MedicalServices
+        "transportation" -> Icons.Default.DirectionsBus
+        "utilities" -> Icons.Default.Bolt
+        "personal care" -> Icons.Default.Face
+        "food & dining" -> Icons.Default.Dining
+        "salary" -> Icons.Default.Payments
+        "gift" -> Icons.Default.Redeem
+        "received" -> Icons.Default.CallReceived
+        "repaid" -> Icons.Default.CheckCircle
+        "lent" -> Icons.Default.CallMade
+        "borrowed" -> Icons.Default.Undo
+        "other" -> Icons.Default.MoreHoriz
+        else -> Icons.Default.Category
+    }
 }
 
 @Composable
@@ -219,7 +255,7 @@ fun SummaryTab(
 
     // Dynamic Summary Calculation based on filtered transactions
     val income = remember(filteredTransactions) {
-        filteredTransactions.filter { it.type in listOf("SALARY", "RECEIVED", "GIFT") }.sumOf { it.amount }
+        filteredTransactions.filter { it.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT") }.sumOf { it.amount }
     }
     val expense = remember(filteredTransactions) {
         filteredTransactions.filter { it.type in listOf("EXPENSE", "OTHER") }.sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
@@ -708,7 +744,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
     viewModel: ExpenseViewModel,
@@ -729,6 +765,7 @@ fun AddTransactionScreen(
     var type by remember(editingTransaction) { mutableStateOf(editingTransaction?.type ?: "EXPENSE") }
     var amount by remember(editingTransaction) { mutableStateOf(editingTransaction?.amount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
     var categoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.categoryId) }
+    var subCategoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.subCategoryId) }
     var accountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.accountId) }
     var toAccountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.toAccountId) }
     var isSplit by remember(editingTransaction) { mutableStateOf(editingTransaction?.isSplit ?: false) }
@@ -742,6 +779,7 @@ fun AddTransactionScreen(
 
     val categories by viewModel.categories.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
+    val subCategories by viewModel.subCategories.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
     val existingFriends = remember(friendBalances) { friendBalances.map { it.friendName }.distinct() }
     
@@ -751,6 +789,12 @@ fun AddTransactionScreen(
     
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
+    var showCategorySheet by remember { mutableStateOf(false) }
+    var showSubCategorySheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(categoryId) {
+        viewModel.selectCategory(categoryId)
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().background(FintechDeepDark).padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
@@ -860,13 +904,59 @@ fun AddTransactionScreen(
 
         if (mainType == "Spent" || mainType == "Received") {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("Sub Category (Optional)", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                Text("Primary Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        FintechDropdown(options = categories.map { it.id to it.name.toSentenceCase() }, selectedId = categoryId, placeholder = "Select Category") { categoryId = it }
+                    Box(modifier = Modifier.weight(1f).clickable { showCategorySheet = true }) {
+                        OutlinedTextField(
+                            value = categories.find { it.id == categoryId }?.name ?: "Choose Category",
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FintechCard,
+                                unfocusedContainerColor = FintechCard,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                disabledContainerColor = FintechCard,
+                                disabledBorderColor = Color.Transparent,
+                                disabledTextColor = Color.White
+                            ),
+                            enabled = false
+                        )
                     }
                     IconButton(onClick = { showAddCategoryDialog = true }, modifier = Modifier.size(56.dp).clip(CircleShape).background(FintechCard)) {
                         Icon(Icons.Default.Add, null, tint = FintechAccent)
+                    }
+                }
+            }
+
+            if (categoryId != null) {
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text("Sub Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                    
+                    Box(modifier = Modifier.fillMaxWidth().clickable { showSubCategorySheet = true }) {
+                        OutlinedTextField(
+                            value = subCategories.find { it.id == subCategoryId }?.name ?: "Choose Sub-Category",
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FintechCard,
+                                unfocusedContainerColor = FintechCard,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                disabledContainerColor = FintechCard,
+                                disabledBorderColor = Color.Transparent,
+                                disabledTextColor = Color.White
+                            ),
+                            enabled = false
+                        )
                     }
                 }
             }
@@ -911,7 +1001,7 @@ fun AddTransactionScreen(
 
                 val tx = TransactionEntity(
                     id = editingTransaction?.id ?: UUID.randomUUID().toString(), amount = totalAmt, type = type,
-                    categoryId = categoryId, accountId = accountId, toAccountId = toAccountId,
+                    categoryId = categoryId, subCategoryId = subCategoryId, accountId = accountId, toAccountId = toAccountId,
                     isSplit = isSplit, splitAmount = calSplitAmt, splitType = splitType, splitRatio = splitRatio,
                     friendName = friendName.trim().toSentenceCase().ifBlank { null },
                     note = note.ifBlank { null }?.toSentenceCase(), 
@@ -930,6 +1020,31 @@ fun AddTransactionScreen(
         Spacer(Modifier.height(120.dp))
     }
 
+    if (showCategorySheet) {
+        CategoryGridSelector(
+            categories = categories,
+            onCategorySelected = { 
+                categoryId = it.id
+                subCategoryId = null
+                showCategorySheet = false
+            },
+            onDismiss = { showCategorySheet = false }
+        )
+    }
+
+    if (showSubCategorySheet) {
+        SubCategoryGridSelector(
+            viewModel = viewModel,
+            categoryId = categoryId ?: "",
+            subCategories = subCategories,
+            onSubCategorySelected = { 
+                subCategoryId = it.id
+                showSubCategorySheet = false
+            },
+            onDismiss = { showSubCategorySheet = false }
+        )
+    }
+
     if (showAddCategoryDialog) {
         var name by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { showAddCategoryDialog = false }, containerColor = FintechCard, titleContentColor = Color.White, title = { Text("Add Category") },
@@ -941,6 +1056,175 @@ fun AddTransactionScreen(
 
     if (showAddAccountDialog) {
         AccountDialog(onDismiss = { showAddAccountDialog = false }, onConfirm = { n, b, t -> viewModel.addAccount(n, b, t); showAddAccountDialog = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoryGridSelector(
+    categories: List<CategoryEntity>,
+    onCategorySelected: (CategoryEntity) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = FintechCard,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+        ) {
+            Text(
+                text = "Select Category",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(categories) { cat ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { onCategorySelected(cat) }
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = FintechDeepDark,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = getIconByName(cat.name),
+                                    contentDescription = cat.name,
+                                    tint = FintechAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = cat.name.toSentenceCase(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SubCategoryGridSelector(
+    viewModel: ExpenseViewModel,
+    categoryId: String,
+    subCategories: List<SubCategoryEntity>,
+    onSubCategorySelected: (SubCategoryEntity) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showAddSubDialog by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = FintechCard,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Select Sub-Category",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                )
+                
+                IconButton(onClick = { showAddSubDialog = true }) {
+                    Icon(Icons.Default.AddCircle, "Add", tint = FintechAccent)
+                }
+            }
+
+            if (subCategories.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(200.dp), Alignment.Center) {
+                    Text("No sub-categories available", color = Color.Gray)
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(subCategories) { sub ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.clickable { onSubCategorySelected(sub) }
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = FintechDeepDark,
+                                modifier = Modifier.size(56.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = getIconByName(sub.name),
+                                        contentDescription = sub.name,
+                                        tint = FintechAccent,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = sub.name.toSentenceCase(),
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddSubDialog) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddSubDialog = false },
+            containerColor = FintechCard,
+            titleContentColor = Color.White,
+            title = { Text("New Sub-Category") },
+            text = { FintechInput(name, "Name (e.g. Starbucks, Netflix)") { name = it } },
+            confirmButton = { 
+                TextButton(onClick = { 
+                    if (name.isNotBlank()) {
+                        viewModel.addSubCategory(categoryId, name.toSentenceCase())
+                        showAddSubDialog = false
+                    }
+                }) { Text("Add") } 
+            },
+            dismissButton = { TextButton(onClick = { showAddSubDialog = false }) { Text("Cancel") } }
+        )
     }
 }
 

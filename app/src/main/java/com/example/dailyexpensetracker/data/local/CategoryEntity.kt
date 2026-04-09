@@ -11,5 +11,7 @@ import java.util.UUID
 )
 data class CategoryEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val name: String = ""
+    val name: String = "",
+    val iconName: String = "Category",
+    val colorHex: String = "#6200EE"
 )
