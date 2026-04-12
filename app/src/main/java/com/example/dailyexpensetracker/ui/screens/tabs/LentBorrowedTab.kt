@@ -35,6 +35,7 @@ import com.example.dailyexpensetracker.data.local.UserEntity
 import com.example.dailyexpensetracker.ui.screens.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
+import com.example.dailyexpensetracker.utils.toSentenceCase
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 

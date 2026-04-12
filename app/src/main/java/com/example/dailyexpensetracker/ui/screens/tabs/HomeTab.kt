@@ -27,10 +27,11 @@ import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.ui.screens.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
+import com.example.dailyexpensetracker.utils.generateCombinedPdf
+import com.example.dailyexpensetracker.utils.toSentenceCase
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.abs
 
 @Composable
 fun HomeTab(
@@ -327,7 +328,7 @@ fun HomeTab(
                                     val monthTx = activeTransactions.filter { it.spentAt in start..end }
                                     
                                     scope.launch {
-                                        generateCombinedPdf(context, "Spendora_Statement_$monthLabel", monthTx, categoryMap.mapValues { it.value.name }, accountMap.mapValues { it.value.name }) { uri ->
+                                        generateCombinedPdf(context, "Spendora_Statement_$monthLabel", monthTx, categoryMap.mapValues { it.value.name }, accountMap.mapValues { it.value.name }) { uri: android.net.Uri ->
                                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                                 setDataAndType(uri, "application/pdf")
                                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

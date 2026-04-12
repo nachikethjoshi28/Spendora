@@ -43,6 +43,7 @@ import com.example.dailyexpensetracker.data.local.AccountEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
+import com.example.dailyexpensetracker.utils.toSentenceCase
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import java.text.SimpleDateFormat
@@ -227,24 +228,20 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
                             "$balancePrefix$${"%.2f".format(abs(totalAccountBalance))}",
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Black,
-                            color = if (totalAccountBalance >= 0) FintechIncome else FintechExpense
+                            color = Color.White
                         )
                     }
                 }
             }
 
             item {
-                Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = Color.White)
-            }
-
-            item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(FintechSurface)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(FintechCard)
                 ) {
-                    SettingsItem(Icons.Default.AccountBalanceWallet, "Your Accounts", FintechAccent) {
+                    SettingsItem(Icons.Default.AccountBalanceWallet, "My Accounts") {
                         showAccountsPage = true
                     }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray.copy(alpha = 0.2f))
@@ -450,7 +447,7 @@ fun AccountsPage(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountHistoryView(
     account: AccountEntity,
@@ -507,12 +504,43 @@ fun AccountHistoryView(
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 items(accountTransactions) { tx ->
-                    TransactionItem(
-                        transaction = tx,
-                        categoryName = (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase(),
-                        accountName = accountMap[tx.accountId]?.name ?: "Unknown",
-                        onLongClick = { if (tx.status != "DELETED") showActions = tx }
-                    )
+                    // Correct implementation using TransactionItem or custom card matching old UI
+                    val categoryName = (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase()
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth().combinedClickable(
+                            onClick = { onEditTransaction(tx) },
+                            onLongClick = { if (tx.status != "DELETED") showActions = tx }
+                        ),
+                        colors = CardDefaults.cardColors(containerColor = FintechSurface),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(tx.note ?: categoryName, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(tx.spentAt)), color = Color.Gray, fontSize = 12.sp)
+                            }
+                            
+                            val isPositive = tx.type in listOf("INCOME", "SALARY", "RECEIVED", "REPAID", "GIFT", "BORROWED")
+                            
+                            val displayAmount = if (tx.toAccountId == account.id) {
+                                tx.amount
+                            } else {
+                                if (isPositive) tx.amount else -tx.amount
+                            }
+
+                            val txPrefix = if (displayAmount < 0) "-" else "+"
+                            Text(
+                                "$txPrefix$${"%.2f".format(abs(displayAmount))}",
+                                color = if (displayAmount >= 0) FintechIncome else FintechExpense,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -541,7 +569,7 @@ fun AccountHistoryView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountDialog(
     account: AccountEntity? = null,
@@ -717,7 +745,18 @@ fun AccountDialog(
                     )
                 }
 
-                FintechInput(value = balanceText, label = "Current Balance") { balanceText = it }
+                OutlinedTextField(
+                    value = balanceText,
+                    onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null || it == "-") balanceText = it },
+                    label = { Text("Current Balance") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = FintechAccent,
+                        unfocusedBorderColor = Color.Gray
+                    )
+                )
             }
         },
         confirmButton = {
