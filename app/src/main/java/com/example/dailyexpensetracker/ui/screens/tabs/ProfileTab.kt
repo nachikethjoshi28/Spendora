@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,7 +41,7 @@ import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.example.dailyexpensetracker.data.local.AccountEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
-import com.example.dailyexpensetracker.ui.screens.FintechInput
+import com.example.dailyexpensetracker.ui.screens.MiniFlowCard
 import com.example.dailyexpensetracker.ui.screens.TransactionItem
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
@@ -131,7 +130,6 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
         uri?.let { viewModel.updateProfilePicture(it.toString()) }
     }
 
-    // Priority based navigation
     if (selectedAccountForHistory != null) {
         BackHandler { selectedAccountForHistory = null }
         AccountHistoryView(
@@ -454,7 +452,7 @@ fun AccountsPage(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountHistoryView(
     account: AccountEntity,
@@ -474,6 +472,26 @@ fun AccountHistoryView(
             .sortedByDescending { it.spentAt }
     }
 
+    val accountIncome = remember(accountTransactions, account.id) {
+        accountTransactions.sumOf { tx ->
+            if (tx.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT", "INCOME") && (tx.accountId == account.id || tx.toAccountId == account.id)) {
+                tx.amount
+            } else if (tx.type == "SELF_TRANSFER" && tx.toAccountId == account.id) {
+                tx.amount
+            } else 0.0
+        }
+    }
+    
+    val accountExpense = remember(accountTransactions, account.id) {
+        accountTransactions.sumOf { tx ->
+            if (tx.type in listOf("EXPENSE", "OTHER") && tx.accountId == account.id) {
+                if (tx.isSplit) tx.amount - tx.splitAmount else tx.amount
+            } else if (tx.type == "SELF_TRANSFER" && tx.accountId == account.id) {
+                tx.amount
+            } else 0.0
+        }
+    }
+
     var showActions by remember { mutableStateOf<TransactionEntity?>(null) }
 
     Scaffold(
@@ -481,11 +499,16 @@ fun AccountHistoryView(
             TopAppBar(
                 title = { 
                     Column {
-                        Text(account.name, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = account.name, 
+                            color = Color.White, 
+                            fontWeight = FontWeight.Bold, 
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         val balancePrefix = if (account.balance < 0) "-" else ""
                         Text(
                             text = "Balance: $balancePrefix$${"%.2f".format(abs(account.balance))}",
-                            color = if (account.balance >= 0) FintechIncome else FintechExpense,
+                            color = FintechIncome,
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -500,16 +523,55 @@ fun AccountHistoryView(
         },
         containerColor = FintechDeepDark
     ) { padding ->
-        if (accountTransactions.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No transactions for this account", color = Color.Gray)
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+        ) {
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                    Text(
+                        text = "Current Balance",
+                        color = Color.Gray, 
+                        fontWeight = FontWeight.Medium, 
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "$${"%.2f".format(account.balance)}",
+                        color = if (account.balance >= 0) FintechIncome else FintechExpense,
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
+
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MiniFlowCard("Income", accountIncome, FintechIncome, Modifier.weight(1f))
+                    MiniFlowCard("Expense", accountExpense, FintechExpense, Modifier.weight(1f))
+                }
+            }
+
+            item {
+                Text(
+                    text = "History", 
+                    style = MaterialTheme.typography.titleLarge, 
+                    fontWeight = FontWeight.Black, 
+                    color = Color.White,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
+
+            if (accountTransactions.isEmpty()) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) {
+                        Text("No transactions for this account", color = Color.Gray)
+                    }
+                }
+            } else {
                 items(accountTransactions) { tx ->
                     TransactionItem(
                         transaction = tx,
@@ -545,7 +607,7 @@ fun AccountHistoryView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountDialog(
     account: AccountEntity? = null,
@@ -721,7 +783,18 @@ fun AccountDialog(
                     )
                 }
 
-                FintechInput(value = balanceText, label = "Current Balance") { balanceText = it }
+                OutlinedTextField(
+                    value = balanceText,
+                    onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null || it == "-") balanceText = it },
+                    label = { Text("Current Balance") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = FintechAccent,
+                        unfocusedBorderColor = Color.Gray
+                    )
+                )
             }
         },
         confirmButton = {
