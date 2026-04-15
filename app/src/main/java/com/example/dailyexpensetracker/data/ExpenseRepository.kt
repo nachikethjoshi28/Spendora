@@ -23,21 +23,14 @@ class ExpenseRepository(
     private val auth = Firebase.auth
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // Real-time Firestore listeners
     fun getTransactionsFlow(uid: String): Flow<List<TransactionEntity>> = callbackFlow {
         val listener = firestore.collection("users").document(uid)
             .collection("transactions")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ExpenseRepository", "Firestore Transactions Listener Error: ${error.message}")
-                    return@addSnapshotListener
-                }
+                if (error != null) return@addSnapshotListener
                 val txs = snapshot?.toObjects(TransactionEntity::class.java) ?: emptyList()
                 trySend(txs)
-                
-                repositoryScope.launch {
-                    txs.forEach { transactionDao.insertTransaction(it) }
-                }
+                repositoryScope.launch { txs.forEach { transactionDao.insertTransaction(it) } }
             }
         awaitClose { listener.remove() }
     }
@@ -46,16 +39,10 @@ class ExpenseRepository(
         val listener = firestore.collection("users").document(uid)
             .collection("accounts")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ExpenseRepository", "Firestore Accounts Listener Error: ${error.message}")
-                    return@addSnapshotListener
-                }
+                if (error != null) return@addSnapshotListener
                 val accs = snapshot?.toObjects(AccountEntity::class.java) ?: emptyList()
                 trySend(accs)
-                
-                repositoryScope.launch {
-                    accs.forEach { accountDao.insertAccount(it) }
-                }
+                repositoryScope.launch { accs.forEach { accountDao.insertAccount(it) } }
             }
         awaitClose { listener.remove() }
     }
@@ -64,15 +51,26 @@ class ExpenseRepository(
         val listener = firestore.collection("users").document(uid)
             .collection("categories")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ExpenseRepository", "Firestore Categories Listener Error: ${error.message}")
-                    return@addSnapshotListener
-                }
+                if (error != null) return@addSnapshotListener
                 val cats = snapshot?.toObjects(CategoryEntity::class.java) ?: emptyList()
                 trySend(cats)
-                
-                repositoryScope.launch {
-                    cats.forEach { categoryDao.insertCategory(it) }
+                repositoryScope.launch { cats.forEach { categoryDao.insertCategory(it) } }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun getSubCategoriesFlow(uid: String): Flow<List<SubCategoryEntity>> = callbackFlow {
+        val listener = firestore.collection("users").document(uid)
+            .collection("subcategories")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("ExpenseRepository", "Error listening to subcategories: ${error.message}")
+                    return@addSnapshotListener
+                }
+                val subs = snapshot?.toObjects(SubCategoryEntity::class.java) ?: emptyList()
+                trySend(subs)
+                repositoryScope.launch { 
+                    subs.forEach { categoryDao.insertSubCategory(it) } 
                 }
             }
         awaitClose { listener.remove() }
@@ -82,16 +80,10 @@ class ExpenseRepository(
         val listener = firestore.collection("users").document(uid)
             .collection("friends")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ExpenseRepository", "Firestore Friends Listener Error: ${error.message}")
-                    return@addSnapshotListener
-                }
+                if (error != null) return@addSnapshotListener
                 val friends = snapshot?.toObjects(FriendEntity::class.java) ?: emptyList()
                 trySend(friends)
-                
-                repositoryScope.launch {
-                    friends.forEach { friendDao.insertFriend(it) }
-                }
+                repositoryScope.launch { friends.forEach { friendDao.insertFriend(it) } }
             }
         awaitClose { listener.remove() }
     }
@@ -99,33 +91,21 @@ class ExpenseRepository(
     fun getUserProfileFlow(uid: String): Flow<UserEntity?> = callbackFlow {
         val docRef = firestore.collection("users").document(uid)
         val listener = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                Log.e("ExpenseRepository", "Firestore Profile Listener Error: ${error.message}")
-                return@addSnapshotListener
-            }
-            val user = snapshot?.toObject(UserEntity::class.java)
-            trySend(user)
+            if (error != null) return@addSnapshotListener
+            trySend(snapshot?.toObject(UserEntity::class.java))
         }
         awaitClose { listener.remove() }
     }
 
     suspend fun findUserByContact(contact: String): UserEntity? {
         return try {
-            // Check email
-            val emailQuery = firestore.collection("users")
-                .whereEqualTo("email", contact)
-                .get().await()
+            val emailQuery = firestore.collection("users").whereEqualTo("email", contact).get().await()
             if (!emailQuery.isEmpty) return emailQuery.documents[0].toObject(UserEntity::class.java)
-
-            // Check phone
-            val phoneQuery = firestore.collection("users")
-                .whereEqualTo("phone", contact)
-                .get().await()
+            val phoneQuery = firestore.collection("users").whereEqualTo("phone", contact).get().await()
             if (!phoneQuery.isEmpty) return phoneQuery.documents[0].toObject(UserEntity::class.java)
-
             null
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Error finding user by contact", e)
+            Log.e("ExpenseRepository", "Error finding user", e)
             null
         }
     }
@@ -133,12 +113,9 @@ class ExpenseRepository(
     suspend fun addFriend(friend: FriendEntity) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(uid)
-                .collection("friends").document(friend.id)
-                .set(friend)
-                .await()
+            firestore.collection("users").document(uid).collection("friends").document(friend.id).set(friend).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to add friend", e)
+            Log.e("ExpenseRepository", "Error adding friend", e)
         }
     }
 
@@ -146,47 +123,33 @@ class ExpenseRepository(
         val uid = auth.currentUser?.uid ?: return
         try {
             val categoriesSnapshot = firestore.collection("users").document(uid).collection("categories").get().await()
-
             if (categoriesSnapshot.isEmpty) {
-                val defaults = listOf("Friend", "Shopping", "Rent", "Groceries", "Food", "Travel")
+                val defaults = listOf("Housing", "Utilities", "Groceries", "Govt Services", "Dining Out", "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity", "Fitness", "Subscriptions", "Travel", "Gifts", "Miscellaneous")
                 defaults.forEach { name ->
-                    val categoryId = UUID.randomUUID().toString()
-                    firestore.collection("users").document(uid)
-                        .collection("categories").document(categoryId)
-                        .set(CategoryEntity(id = categoryId, name = name))
+                    firestore.collection("users").document(uid).collection("categories").document(name).set(CategoryEntity(id = name, name = name))
                 }
             }
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to initialize default categories", e)
+            Log.e("ExpenseRepository", "Error initializing categories", e)
         }
     }
 
     suspend fun addTransaction(transaction: TransactionEntity) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(uid)
-                .collection("transactions").document(transaction.id)
-                .set(transaction)
-                .await()
-                
+            firestore.collection("users").document(uid).collection("transactions").document(transaction.id).set(transaction).await()
             updateFirestoreAccountBalance(uid, transaction, 1.0)
-            
-            // Sync with friend if registered
-            if (transaction.friendUid != null) {
-                syncTransactionToFriend(uid, transaction)
-            }
+            if (transaction.friendUid != null) syncTransactionToFriend(uid, transaction)
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to add transaction", e)
+            Log.e("ExpenseRepository", "Error adding transaction", e)
         }
     }
 
     private suspend fun syncTransactionToFriend(currentUid: String, transaction: TransactionEntity) {
         val friendUid = transaction.friendUid ?: return
         val currentUser = getUserProfileFlow(currentUid).firstOrNull() ?: return
-        
-        val friendTransactionId = transaction.id // Using same ID for easy sync/update
         val friendTx = TransactionEntity(
-            id = friendTransactionId,
+            id = transaction.id,
             amount = if (transaction.isSplit) transaction.splitAmount else transaction.amount,
             type = when (transaction.type) {
                 "LENT" -> "BORROWED"
@@ -204,90 +167,53 @@ class ExpenseRepository(
             originalTransactionId = transaction.id,
             isSynced = true
         )
-
         try {
             firestore.collection("users").document(friendUid)
-                .collection("transactions").document(friendTransactionId)
-                .set(friendTx)
-                .await()
-            // Note: We don't automatically update friend's account balance here 
-            // because they might want to choose which account it affects.
-            // But per requirements: "reflect in my friend’s account"
-            // For now, we just add the transaction record.
+                .collection("transactions").document(transaction.id)
+                .set(friendTx).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to sync transaction to friend", e)
+            Log.e("ExpenseRepository", "Error syncing to friend", e)
         }
     }
 
     suspend fun deleteTransaction(transactionId: String) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            val doc = firestore.collection("users").document(uid)
-                .collection("transactions").document(transactionId).get().await()
+            val doc = firestore.collection("users").document(uid).collection("transactions").document(transactionId).get().await()
             val transaction = doc.toObject(TransactionEntity::class.java) ?: return
-            
             if (transaction.status == "DELETED") return
-
-            val deletedTransaction = transaction.copy(status = "DELETED", updatedAt = System.currentTimeMillis())
-            
-            firestore.collection("users").document(uid)
-                .collection("transactions").document(transactionId)
-                .set(deletedTransaction)
-                .await()
-                
+            firestore.collection("users").document(uid).collection("transactions").document(transactionId).update("status", "DELETED", "updatedAt", System.currentTimeMillis()).await()
             updateFirestoreAccountBalance(uid, transaction, -1.0)
-
-            // Sync delete to friend
             if (transaction.friendUid != null) {
-                firestore.collection("users").document(transaction.friendUid!!)
-                    .collection("transactions").document(transactionId)
-                    .update("status", "DELETED", "updatedAt", System.currentTimeMillis())
-                    .await()
+                firestore.collection("users").document(transaction.friendUid!!).collection("transactions").document(transactionId).update("status", "DELETED", "updatedAt", System.currentTimeMillis()).await()
             }
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to delete transaction", e)
+            Log.e("ExpenseRepository", "Error deleting transaction", e)
         }
     }
 
     suspend fun updateTransaction(newTransaction: TransactionEntity) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            val doc = firestore.collection("users").document(uid)
-                .collection("transactions").document(newTransaction.id).get().await()
+            val doc = firestore.collection("users").document(uid).collection("transactions").document(newTransaction.id).get().await()
             val oldTransaction = doc.toObject(TransactionEntity::class.java) ?: return
-            
             updateFirestoreAccountBalance(uid, oldTransaction, -1.0)
-            
             val updatedTransaction = newTransaction.copy(status = "EDITED", updatedAt = System.currentTimeMillis())
-            
-            firestore.collection("users").document(uid)
-                .collection("transactions").document(newTransaction.id)
-                .set(updatedTransaction)
-                .await()
-                
+            firestore.collection("users").document(uid).collection("transactions").document(newTransaction.id).set(updatedTransaction).await()
             updateFirestoreAccountBalance(uid, updatedTransaction, 1.0)
-
-            // Sync update to friend
-            if (newTransaction.friendUid != null) {
-                syncTransactionToFriend(uid, updatedTransaction)
-            }
+            if (newTransaction.friendUid != null) syncTransactionToFriend(uid, updatedTransaction)
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to update transaction", e)
+            Log.e("ExpenseRepository", "Error updating transaction", e)
         }
     }
 
     private suspend fun updateFirestoreAccountBalance(uid: String, transaction: TransactionEntity, signFactor: Double) {
         try {
-            if (transaction.type == "SELF_TRANSFER") {
-                transaction.accountId?.let { fromId ->
-                    adjustFirestoreBalance(uid, fromId, -transaction.amount * signFactor)
-                }
-                transaction.toAccountId?.let { toId ->
-                    adjustFirestoreBalance(uid, toId, transaction.amount * signFactor)
-                }
+            if (transaction.type in listOf("SELF_TRANSFER", "BILL PAYMENT", "LOAD GIFT CARD")) {
+                transaction.accountId?.let { adjustFirestoreBalance(uid, it, -transaction.amount * signFactor) }
+                transaction.toAccountId?.let { adjustFirestoreBalance(uid, it, transaction.amount * signFactor) }
                 return
             }
-
             transaction.accountId?.let { accId ->
                 val typeFactor = when (transaction.type) {
                     "SALARY", "BORROWED", "RECEIVED", "GIFT" -> 1.0
@@ -297,22 +223,20 @@ class ExpenseRepository(
                 adjustFirestoreBalance(uid, accId, transaction.amount * typeFactor * signFactor)
             }
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to update account balance", e)
+            Log.e("ExpenseRepository", "Error updating balance", e)
         }
     }
 
     private suspend fun adjustFirestoreBalance(uid: String, accountId: String, delta: Double) {
-        val docRef = firestore.collection("users").document(uid)
-            .collection("accounts").document(accountId)
-            
+        val docRef = firestore.collection("users").document(uid).collection("accounts").document(accountId)
         try {
-            firestore.runTransaction { firestoreTransaction ->
-                val snapshot = firestoreTransaction.get(docRef)
+            firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(docRef)
                 val currentBalance = snapshot.getDouble("balance") ?: 0.0
-                firestoreTransaction.update(docRef, "balance", currentBalance + delta)
+                transaction.update(docRef, "balance", currentBalance + delta)
             }.await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Transaction for balance adjustment failed", e)
+            Log.e("ExpenseRepository", "Transaction failed", e)
         }
     }
 
@@ -320,85 +244,58 @@ class ExpenseRepository(
         val uid = auth.currentUser?.uid ?: return
         try {
             val accountId = UUID.randomUUID().toString()
-            val newAccount = AccountEntity(id = accountId, name = name, balance = 0.0, type = type)
-            
-            firestore.collection("users").document(uid)
-                .collection("accounts").document(accountId)
-                .set(newAccount)
-                .await()
-            
-            if (balance > 0) {
-                addTransaction(TransactionEntity(
-                    amount = balance,
-                    type = "SALARY",
-                    accountId = accountId,
-                    note = "Initial Balance",
-                    status = "ACTIVE"
-                ))
-            }
+            firestore.collection("users").document(uid).collection("accounts").document(accountId).set(AccountEntity(id = accountId, name = name, balance = 0.0, type = type)).await()
+            if (balance > 0) addTransaction(TransactionEntity(amount = balance, type = "SALARY", accountId = accountId, note = "Initial Balance", status = "ACTIVE"))
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to add account", e)
+            Log.e("ExpenseRepository", "Error adding account", e)
         }
     }
 
     suspend fun updateAccount(account: AccountEntity) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(uid)
-                .collection("accounts").document(account.id)
-                .set(account)
-                .await()
+            firestore.collection("users").document(uid).collection("accounts").document(account.id).set(account).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to update account", e)
+            Log.e("ExpenseRepository", "Error updating account", e)
         }
     }
 
     suspend fun deleteAccount(account: AccountEntity) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(uid)
-                .collection("accounts").document(account.id)
-                .delete()
-                .await()
+            firestore.collection("users").document(uid).collection("accounts").document(account.id).delete().await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to delete account", e)
+            Log.e("ExpenseRepository", "Error deleting account", e)
         }
     }
 
     suspend fun addCategory(name: String) {
         val uid = auth.currentUser?.uid ?: return
         try {
-            val categoryId = UUID.randomUUID().toString()
-            firestore.collection("users").document(uid)
-                .collection("categories").document(categoryId)
-                .set(CategoryEntity(id = categoryId, name = name))
-                .await()
+            firestore.collection("users").document(uid).collection("categories").document(name).set(CategoryEntity(id = name, name = name)).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to add category", e)
+            Log.e("ExpenseRepository", "Error adding category", e)
         }
     }
 
     suspend fun addSubCategory(categoryId: String, name: String, iconName: String = "Category", colorHex: String = "#6200EE") {
+        val uid = auth.currentUser?.uid ?: return
+        val sub = SubCategoryEntity(id = UUID.randomUUID().toString(), categoryId = categoryId, name = name, iconName = iconName, colorHex = colorHex)
         try {
-            categoryDao.insertSubCategory(SubCategoryEntity(
-                categoryId = categoryId, 
-                name = name, 
-                iconName = iconName, 
-                colorHex = colorHex
-            ))
+            firestore.collection("users").document(uid).collection("subcategories").document(sub.id).set(sub).await()
+            categoryDao.insertSubCategory(sub)
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to add subcategory locally", e)
+            Log.e("ExpenseRepository", "Error adding subcategory: ${e.message}")
+            // Even if cloud write fails, we might still want to add it locally or notify user
         }
     }
 
     suspend fun saveUserProfile(user: UserEntity) {
         try {
             val doc = firestore.collection("users").document(user.uid).get().await()
-            if (!doc.exists()) {
-                firestore.collection("users").document(user.uid).set(user).await()
-            }
+            if (!doc.exists()) firestore.collection("users").document(user.uid).set(user).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to save user profile to Firestore", e)
+            Log.e("ExpenseRepository", "Error saving profile", e)
         }
     }
 
@@ -406,45 +303,32 @@ class ExpenseRepository(
         try {
             firestore.collection("users").document(user.uid).set(user).await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to update user profile in Firestore", e)
+            Log.e("ExpenseRepository", "Error updating profile", e)
         }
     }
 
     suspend fun isUsernameAvailable(username: String): Boolean {
         return try {
-            val snapshot = firestore.collection("users")
-                .whereEqualTo("username", username)
-                .get()
-                .await()
-            snapshot.isEmpty
+            firestore.collection("users").whereEqualTo("username", username).get().await().isEmpty
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to check username availability", e)
+            Log.e("ExpenseRepository", "Error checking username", e)
             true
         }
     }
 
-    suspend fun logout() {
-        auth.signOut()
-    }
+    suspend fun logout() { auth.signOut() }
 
     suspend fun clearAllData() {
         val uid = auth.currentUser?.uid ?: return
         try {
-            val txs = firestore.collection("users").document(uid).collection("transactions").get().await()
-            txs.documents.forEach { it.reference.delete() }
-            
-            val accs = firestore.collection("users").document(uid).collection("accounts").get().await()
-            accs.documents.forEach { it.reference.delete() }
-
-            val cats = firestore.collection("users").document(uid).collection("categories").get().await()
-            cats.documents.forEach { it.reference.delete() }
-            
-            val friends = firestore.collection("users").document(uid).collection("friends").get().await()
-            friends.documents.forEach { it.reference.delete() }
+            val collections = listOf("transactions", "accounts", "categories", "subcategories", "friends")
+            collections.forEach { coll ->
+                val docs = firestore.collection("users").document(uid).collection(coll).get().await()
+                docs.documents.forEach { it.reference.delete() }
+            }
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to clear cloud data", e)
+            Log.e("ExpenseRepository", "Error clearing cloud data", e)
         }
-        
         transactionDao.deleteAllTransactions()
         accountDao.deleteAllAccounts()
         friendDao.deleteAllFriends()
@@ -455,30 +339,15 @@ class ExpenseRepository(
         val uid = user?.uid
         try {
             if (uid != null) {
-                val txs = firestore.collection("users").document(uid).collection("transactions").get().await()
-                txs.documents.forEach { it.reference.delete() }
-                
-                val accs = firestore.collection("users").document(uid).collection("accounts").get().await()
-                accs.documents.forEach { it.reference.delete() }
-
-                val cats = firestore.collection("users").document(uid).collection("categories").get().await()
-                cats.documents.forEach { it.reference.delete() }
-
-                val friends = firestore.collection("users").document(uid).collection("friends").get().await()
-                friends.documents.forEach { it.reference.delete() }
-
+                clearAllData()
                 firestore.collection("users").document(uid).delete().await()
             }
             user?.delete()?.await()
         } catch (e: Exception) {
-            Log.e("ExpenseRepository", "Failed to delete user account fully", e)
+            Log.e("ExpenseRepository", "Error deleting account", e)
         }
-        transactionDao.deleteAllTransactions()
-        accountDao.deleteAllAccounts()
-        friendDao.deleteAllFriends()
     }
 
     fun getSubCategories(categoryId: String) = categoryDao.getSubCategoriesByCategory(categoryId)
-
     fun getAllSubCategories(): Flow<List<SubCategoryEntity>> = categoryDao.getAllSubCategories()
 }

@@ -53,7 +53,7 @@ fun TransactionItem(
     val formatter = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
     val isDeleted = transaction.status == "DELETED"
     val isPositive = transaction.type in listOf("INCOME", "SALARY", "RECEIVED", "REPAID", "GIFT")
-    val isTransfer = transaction.type == "SELF_TRANSFER"
+    val isTransferType = transaction.type in listOf("SELF_TRANSFER", "BILL PAYMENT", "LOAD GIFT CARD")
     
     val isPreviousDate = remember(transaction) {
         val cal1 = Calendar.getInstance().apply { timeInMillis = transaction.spentAt }
@@ -83,19 +83,29 @@ fun TransactionItem(
                     Icon(
                         imageVector = when {
                             isDeleted -> Icons.Default.Block
-                            isTransfer -> Icons.Default.SyncAlt
+                            isTransferType -> Icons.Default.SyncAlt
                             isPositive -> Icons.AutoMirrored.Filled.TrendingUp
                             else -> Icons.AutoMirrored.Filled.TrendingDown
                         },
                         contentDescription = null,
-                        tint = if (isDeleted) ThemeExpense else if (isTransfer) Color.Cyan else if (isPositive) ThemeIncome else ThemeExpense,
+                        tint = if (isDeleted) ThemeExpense else if (isTransferType) Color.Cyan else if (isPositive) ThemeIncome else ThemeExpense,
                         modifier = Modifier.size(24.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
+                    val primarySub = transaction.categoryId
+                    val secondarySub = transaction.subCategoryId
+                    
+                    val titleText = when {
+                        isTransferType && transaction.type == "SELF_TRANSFER" -> "Card Payment"
+                        secondarySub != null -> secondarySub
+                        primarySub != null -> primarySub
+                        else -> categoryName
+                    }
+
                     Text(
-                        text = if (isDeleted) "CANCELLED" else if (isTransfer) "Card Payment" else categoryName.toSentenceCase(),
+                        text = if (isDeleted) "CANCELLED" else titleText.toSentenceCase(),
                         fontWeight = FontWeight.Bold,
                         color = if (isDeleted) ThemeExpense else Color.White,
                         fontSize = 16.sp,
@@ -110,8 +120,8 @@ fun TransactionItem(
                 Column(horizontalAlignment = Alignment.End) {
                     val displayAmount = if (transaction.isSplit) transaction.amount - transaction.splitAmount else transaction.amount
                     Text(
-                        text = (if (isTransfer) "" else if (isPositive) "+" else "-") + "$" + "%.2f".format(displayAmount),
-                        color = if (isDeleted) ThemeExpense else if (isTransfer) Color.Cyan else if (isPositive) ThemeIncome else ThemeExpense,
+                        text = (if (isTransferType && transaction.type == "SELF_TRANSFER") "" else if (isPositive) "+" else "-") + "$" + "%.2f".format(displayAmount),
+                        color = if (isDeleted) ThemeExpense else if (isTransferType) Color.Cyan else if (isPositive) ThemeIncome else ThemeExpense,
                         fontWeight = FontWeight.Black,
                         fontSize = 16.sp,
                         textDecoration = if (isDeleted) TextDecoration.LineThrough else null
@@ -131,8 +141,14 @@ fun TransactionItem(
                     DetailRow("Posted on", formatter.format(Date(transaction.createdAt)))
                     if (isPreviousDate) DetailRow("Transaction Date", formatter.format(Date(transaction.spentAt)))
                     
-                    if (!isTransfer) DetailRow("Category", categoryName)
-                    DetailRow(if (isTransfer) "From Account" else "Account", accountName)
+                    if (transaction.categoryId != null) {
+                        DetailRow("Expense Subcategory", transaction.categoryId!!)
+                    }
+                    if (transaction.subCategoryId != null) {
+                        DetailRow("Secondary Subcategory", transaction.subCategoryId!!)
+                    }
+                    
+                    DetailRow(if (isTransferType) "From Account" else "Account", accountName)
                     
                     transaction.friendName?.let { friendName ->
                         DetailRow("Friend", friendName)
@@ -217,11 +233,6 @@ fun FintechInput(value: String, label: String, onValueChange: (String) -> Unit) 
 }
 
 @Composable
-fun FintechTextField(value: String, label: String, onValueChange: (String) -> Unit) {
-    FintechInput(value, label, onValueChange)
-}
-
-@Composable
 fun FintechChoiceChip(label: String, selected: Boolean, modifier: Modifier = Modifier, selectedColor: Color = Color.White, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
@@ -298,6 +309,7 @@ fun FintechAutocompleteInput(value: String, suggestions: List<String>, onValueCh
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryGridSelector(
+    title: String = "Select Expense Subcategory",
     categories: List<CategoryEntity>,
     onCategorySelected: (CategoryEntity) -> Unit,
     onDismiss: () -> Unit
@@ -313,7 +325,7 @@ fun CategoryGridSelector(
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
         ) {
             Text(
-                text = "Select Category",
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
                 color = Color.White,
@@ -321,7 +333,7 @@ fun CategoryGridSelector(
             )
 
             LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
+                columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -387,7 +399,7 @@ fun SubCategoryGridSelector(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Select Sub-Category",
+                    text = "Secondary Subcategory",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                     color = Color.White
@@ -400,11 +412,11 @@ fun SubCategoryGridSelector(
 
             if (subCategories.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(200.dp), Alignment.Center) {
-                    Text("No sub-categories available", color = Color.Gray)
+                    Text("No options available. Click + to add.", color = Color.Gray)
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+                    columns = GridCells.Fixed(3),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -449,8 +461,8 @@ fun SubCategoryGridSelector(
             onDismissRequest = { showAddSubDialog = false },
             containerColor = FintechCard,
             titleContentColor = Color.White,
-            title = { Text("New Sub-Category") },
-            text = { FintechInput(name, "Name (e.g. Starbucks, Netflix)") { name = it } },
+            title = { Text("New Detail") },
+            text = { FintechInput(name, "Name (e.g. Walmart, Target)") { name = it } },
             confirmButton = { 
                 TextButton(onClick = { 
                     if (name.isNotBlank()) {

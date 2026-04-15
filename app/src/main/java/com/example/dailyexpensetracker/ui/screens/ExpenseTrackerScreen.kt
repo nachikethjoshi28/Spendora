@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dailyexpensetracker.data.local.TransactionEntity
+import com.example.dailyexpensetracker.data.local.CategoryEntity
+import com.example.dailyexpensetracker.data.local.SubCategoryEntity
 import com.example.dailyexpensetracker.ui.screens.tabs.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
@@ -90,6 +92,9 @@ fun MainScaffold(viewModel: ExpenseViewModel) {
     
     val tabs = listOf("Home", "Insights", "Add", "Friends", "Profile")
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Collect all subcategories to keep the Firestore listener alive
+    val allSubs by viewModel.allSubCategories.collectAsState()
 
     BackHandler(enabled = selectedTab != 0) {
         selectedTab = 0
@@ -201,7 +206,7 @@ fun AddTransactionScreen(
         mutableStateOf(when(editingTransaction?.type) {
             "EXPENSE", "REPAID", "OTHER" -> "Spent"
             "SALARY", "RECEIVED", "GIFT" -> "Received"
-            "SELF_TRANSFER" -> "Card Payment"
+            "BILL PAYMENT", "LOAD GIFT CARD", "SELF_TRANSFER" -> "Card Payment"
             "LENT", "BORROWED" -> "Debts & Loans"
             else -> "Spent"
         })
@@ -209,8 +214,12 @@ fun AddTransactionScreen(
     
     var type by remember(editingTransaction) { mutableStateOf(editingTransaction?.type ?: "EXPENSE") }
     var amount by remember(editingTransaction) { mutableStateOf(editingTransaction?.amount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
+    
+    // categoryId stores the "Expense Subcategory" (Groceries, etc.)
     var categoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.categoryId) }
+    // subCategoryId stores the "Secondary Subcategory" (Walmart, etc.)
     var subCategoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.subCategoryId) }
+    
     var accountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.accountId) }
     var toAccountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.toAccountId) }
     var isSplit by remember(editingTransaction) { mutableStateOf(editingTransaction?.isSplit ?: false) }
@@ -222,9 +231,7 @@ fun AddTransactionScreen(
     var splitRatio by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitRatio ?: "50") }
     var friendsShareInput by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitAmount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
 
-    val categories by viewModel.categories.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
-    val subCategories by viewModel.subCategories.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
     val existingFriends = remember(friendBalances) { friendBalances.map { it.friendName }.distinct() }
     
@@ -232,10 +239,15 @@ fun AddTransactionScreen(
     val context = LocalContext.current
     val calendar = Calendar.getInstance().apply { timeInMillis = spentAt }
     
-    var showAddCategoryDialog by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showCategorySheet by remember { mutableStateOf(false) }
     var showSubCategorySheet by remember { mutableStateOf(false) }
+
+    val expenseSubCategories = listOf(
+        "Housing", "Utilities", "Groceries", "Govt Services", "Dining Out",
+        "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity",
+        "Fitness", "Subscriptions", "Travel", "Gifts", "Miscellaneous"
+    ).map { CategoryEntity(id = it, name = it) }
 
     LaunchedEffect(categoryId) {
         viewModel.selectCategory(categoryId)
@@ -275,11 +287,13 @@ fun AddTransactionScreen(
                             type = when(mt) {
                                 "Spent" -> "EXPENSE"
                                 "Received" -> "SALARY"
-                                "Card Payment" -> "SELF_TRANSFER"
+                                "Card Payment" -> "BILL PAYMENT"
                                 "Debts & Loans" -> "LENT"
                                 else -> "EXPENSE"
                             }
                             isSplit = false
+                            categoryId = null
+                            subCategoryId = null
                         }
                     }
                 }
@@ -288,19 +302,26 @@ fun AddTransactionScreen(
                 Text("Primary Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                val subTypes = when(mainType) {
+                val primaryCategories = when(mainType) {
                     "Spent" -> listOf("EXPENSE", "REPAID", "OTHER")
                     "Received" -> listOf("SALARY", "RECEIVED", "GIFT")
                     "Debts & Loans" -> listOf("LENT", "BORROWED")
+                    "Card Payment" -> listOf("BILL PAYMENT", "LOAD GIFT CARD")
                     else -> emptyList()
                 }
                 
-                if (subTypes.isNotEmpty()) {
+                if (primaryCategories.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        subTypes.forEach { st ->
+                        primaryCategories.forEach { st ->
                             FilterChip(
                                 selected = type == st,
-                                onClick = { type = st },
+                                onClick = { 
+                                    type = st 
+                                    if (type != "EXPENSE") {
+                                        categoryId = null
+                                        subCategoryId = null
+                                    }
+                                },
                                 label = { Text(st.replace("_", " "), fontSize = 10.sp) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent)
                             )
@@ -340,51 +361,40 @@ fun AddTransactionScreen(
                     }
                 }
             }
-        }
 
-        if (isSplit || mainType == "Debts & Loans" || type == "REPAID" || type == "RECEIVED") {
-            Spacer(Modifier.height(8.dp))
-            FintechAutocompleteInput(friendName, existingFriends, { friendName = it }, "Friend Name")
-        }
-
-        if (mainType == "Spent" || mainType == "Received") {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("Primary Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f).clickable { showCategorySheet = true }) {
-                        OutlinedTextField(
-                            value = categories.find { it.id == categoryId }?.name ?: "Choose Category",
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = FintechCard,
-                                unfocusedContainerColor = FintechCard,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                disabledContainerColor = FintechCard,
-                                disabledBorderColor = Color.Transparent,
-                                disabledTextColor = Color.White
-                            ),
-                            enabled = false
-                        )
-                    }
-                    IconButton(onClick = { showAddCategoryDialog = true }, modifier = Modifier.size(56.dp).clip(CircleShape).background(FintechCard)) {
-                        Icon(Icons.Default.Add, null, tint = FintechAccent)
-                    }
+                Text("Expense Subcategory", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                
+                Box(modifier = Modifier.fillMaxWidth().clickable { showCategorySheet = true }) {
+                    OutlinedTextField(
+                        value = categoryId ?: "Choose Subcategory",
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = FintechCard,
+                            unfocusedContainerColor = FintechCard,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            disabledContainerColor = FintechCard,
+                            disabledBorderColor = Color.Transparent,
+                            disabledTextColor = Color.White
+                        ),
+                        enabled = false
+                    )
                 }
             }
 
             if (categoryId != null) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Text("Sub Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                    Text("Secondary Subcategory", color = if (categoryId == "Miscellaneous") FintechAccent else Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                     
                     Box(modifier = Modifier.fillMaxWidth().clickable { showSubCategorySheet = true }) {
                         OutlinedTextField(
-                            value = subCategories.find { it.id == subCategoryId }?.name ?: "Choose Sub-Category",
+                            value = subCategoryId ?: "Choose Detail (e.g. Walmart)",
                             onValueChange = {},
                             readOnly = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -405,6 +415,11 @@ fun AddTransactionScreen(
                     }
                 }
             }
+        }
+
+        if (isSplit || mainType == "Debts & Loans" || type == "REPAID" || type == "RECEIVED") {
+            Spacer(Modifier.height(8.dp))
+            FintechAutocompleteInput(friendName, existingFriends, { friendName = it }, "Friend Name")
         }
 
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -434,6 +449,11 @@ fun AddTransactionScreen(
                 val totalAmt = amount.toDoubleOrNull() ?: 0.0
                 if (totalAmt <= 0) { scope.launch { snackbarHostState.showSnackbar("Invalid amount") }; return@Button }
                 
+                if (mainType == "Spent" && type == "EXPENSE" && categoryId == "Miscellaneous" && subCategoryId.isNullOrBlank()) {
+                    scope.launch { snackbarHostState.showSnackbar("Secondary Subcategory is mandatory for Miscellaneous") }
+                    return@Button
+                }
+
                 var calSplitAmt = 0.0
                 if (isSplit) {
                     calSplitAmt = when (splitType) {
@@ -467,10 +487,11 @@ fun AddTransactionScreen(
 
     if (showCategorySheet) {
         CategoryGridSelector(
-            categories = categories,
+            title = "Select Expense Subcategory",
+            categories = expenseSubCategories,
             onCategorySelected = { 
+                if (categoryId != it.id) subCategoryId = null // Clear secondary if primary changes
                 categoryId = it.id
-                subCategoryId = null
                 showCategorySheet = false
             },
             onDismiss = { showCategorySheet = false }
@@ -478,24 +499,16 @@ fun AddTransactionScreen(
     }
 
     if (showSubCategorySheet) {
+        val currentSubCategories by viewModel.subCategories.collectAsState()
         SubCategoryGridSelector(
             viewModel = viewModel,
             categoryId = categoryId ?: "",
-            subCategories = subCategories,
+            subCategories = currentSubCategories,
             onSubCategorySelected = { 
-                subCategoryId = it.id
+                subCategoryId = it.name
                 showSubCategorySheet = false
             },
             onDismiss = { showSubCategorySheet = false }
-        )
-    }
-
-    if (showAddCategoryDialog) {
-        var name by remember { mutableStateOf("") }
-        AlertDialog(onDismissRequest = { showAddCategoryDialog = false }, containerColor = FintechCard, titleContentColor = Color.White, title = { Text("Add Category") },
-            text = { FintechInput(name, "Category Name") { name = it } },
-            confirmButton = { TextButton(onClick = { if (name.isNotBlank()) { viewModel.addCategory(name.toSentenceCase()); showAddCategoryDialog = false } }) { Text("Add") } },
-            dismissButton = { TextButton(onClick = { showAddCategoryDialog = false }) { Text("Cancel") } }
         )
     }
 

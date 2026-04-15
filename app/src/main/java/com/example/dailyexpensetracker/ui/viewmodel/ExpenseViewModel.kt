@@ -61,6 +61,14 @@ class ExpenseViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    val allSubCategories: StateFlow<List<SubCategoryEntity>> = _currentUid
+        .flatMapLatest { uid ->
+            if (uid != null) repository.getSubCategoriesFlow(uid)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val accounts: StateFlow<List<AccountEntity>> = _currentUid
         .flatMapLatest { uid ->
             if (uid != null) repository.getAccountsFlow(uid)
