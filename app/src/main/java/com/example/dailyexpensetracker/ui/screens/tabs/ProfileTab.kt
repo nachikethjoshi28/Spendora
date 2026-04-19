@@ -116,6 +116,7 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
     val context = LocalContext.current
     val accounts by viewModel.accounts.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
     
     var showAccountsPage by remember { mutableStateOf(false) }
     var selectedAccountForHistory by remember { mutableStateOf<AccountEntity?>(null) }
@@ -151,7 +152,7 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(FintechDeepDark)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
@@ -163,7 +164,10 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
                         .clip(RoundedCornerShape(28.dp))
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(FintechCard, FintechSurface)
+                                colors = if (isDarkMode) 
+                                    listOf(FintechCard, FintechSurface) 
+                                else 
+                                    listOf(PastelPeach, PastelOrange)
                             )
                         )
                         .padding(24.dp)
@@ -174,7 +178,7 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
                                 modifier = Modifier
                                     .size(80.dp)
                                     .clip(CircleShape)
-                                    .background(FintechDeepDark)
+                                    .background(MaterialTheme.colorScheme.background)
                                     .combinedClickable(
                                         onClick = { photoLauncher.launch("image/*") }
                                     ),
@@ -192,14 +196,14 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
                                         Icons.Default.Person,
                                         contentDescription = null,
                                         modifier = Modifier.size(48.dp),
-                                        tint = FintechAccent
+                                        tint = if (isDarkMode) FintechAccent else Color.DarkGray
                                     )
                                 }
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
                                         .size(24.dp)
-                                        .background(FintechAccent, CircleShape),
+                                        .background(if (isDarkMode) FintechAccent else Color.White, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp), tint = Color.Black)
@@ -211,18 +215,18 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
                                     userProfile?.username ?: userProfile?.displayName ?: "User",
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Black,
-                                    color = Color.White
+                                    color = if (isDarkMode) Color.White else Color.Black
                                 )
                                 val dobText = userProfile?.dob?.let {
                                     SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(it))
                                 } ?: "Not Set"
-                                Text("DOB: $dobText", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                                Text("DOB: $dobText", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.Gray else Color.DarkGray)
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
                         
                         val totalAccountBalance = accounts.sumOf { it.balance }
-                        Text("Total Balance", style = MaterialTheme.typography.labelLarge, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Text("Total Balance", style = MaterialTheme.typography.labelLarge, color = if (isDarkMode) Color.Gray else Color.DarkGray, fontWeight = FontWeight.Bold)
                         
                         val balancePrefix = if (totalAccountBalance < 0) "-" else ""
                         Text(
@@ -236,7 +240,7 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
             }
 
             item {
-                Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = Color.White)
+                Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
             }
 
             item {
@@ -244,9 +248,24 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(FintechSurface)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    SettingsItem(Icons.Default.AccountBalanceWallet, "Your Accounts", FintechAccent) {
+                    SettingsItem(
+                        icon = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode, 
+                        title = if (isDarkMode) "Dark Mode" else "Light Mode",
+                        trailing = {
+                            Switch(
+                                checked = isDarkMode,
+                                onCheckedChange = { viewModel.toggleTheme() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = FintechAccent,
+                                    checkedTrackColor = FintechAccent.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+                    ) {}
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray.copy(alpha = 0.2f))
+                    SettingsItem(Icons.Default.AccountBalanceWallet, "Your Accounts", if (isDarkMode) FintechAccent else Color.DarkGray) {
                         showAccountsPage = true
                     }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray.copy(alpha = 0.2f))
@@ -287,8 +306,8 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
-            containerColor = FintechCard,
-            title = { Text("Delete Account?", color = Color.White) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Delete Account?", color = MaterialTheme.colorScheme.onSurface) },
             text = { Text("This action is permanent and will delete all your data.", color = Color.Gray) },
             confirmButton = {
                 Button(
@@ -329,8 +348,8 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
     if (accountOptions != null) {
         AlertDialog(
             onDismissRequest = { accountOptions = null },
-            containerColor = FintechCard,
-            titleContentColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Account Options: ${accountOptions!!.name}") },
             text = { Text("What would you like to do with this account?", color = Color.Gray) },
             confirmButton = {
@@ -355,7 +374,13 @@ fun ProfileTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntit
 }
 
 @Composable
-fun SettingsItem(icon: ImageVector, title: String, color: Color = Color.White, onClick: () -> Unit) {
+fun SettingsItem(
+    icon: ImageVector, 
+    title: String, 
+    color: Color = MaterialTheme.colorScheme.onSurface, 
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
         color = Color.Transparent,
@@ -369,7 +394,11 @@ fun SettingsItem(icon: ImageVector, title: String, color: Color = Color.White, o
             Spacer(modifier = Modifier.width(16.dp))
             Text(title, color = color, fontSize = 16.sp)
             Spacer(modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+            if (trailing != null) {
+                trailing()
+            } else {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+            }
         }
     }
 }
@@ -386,13 +415,13 @@ fun AccountsPage(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Your Accounts", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = { Text("Your Accounts", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = FintechDeepDark)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         floatingActionButton = {
@@ -400,7 +429,7 @@ fun AccountsPage(
                 Icon(Icons.Default.Add, contentDescription = "Add Account", tint = Color.White)
             }
         },
-        containerColor = FintechDeepDark
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (accounts.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -420,7 +449,7 @@ fun AccountsPage(
                                 onClick = { onAccountClick(account) },
                                 onLongClick = { onAccountLongClick(account) }
                             ),
-                        colors = CardDefaults.cardColors(containerColor = FintechSurface),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
@@ -435,7 +464,7 @@ fun AccountsPage(
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(account.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(account.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                 Text(account.type, color = Color.Gray, fontSize = 12.sp)
                             }
                             val accountBalancePrefix = if (account.balance < 0) "-" else ""
@@ -501,7 +530,7 @@ fun AccountHistoryView(
                     Column {
                         Text(
                             text = account.name, 
-                            color = Color.White, 
+                            color = MaterialTheme.colorScheme.onSurface, 
                             fontWeight = FontWeight.Bold, 
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -515,13 +544,13 @@ fun AccountHistoryView(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = FintechDeepDark)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = FintechDeepDark
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -560,7 +589,7 @@ fun AccountHistoryView(
                     text = "History", 
                     style = MaterialTheme.typography.titleLarge, 
                     fontWeight = FontWeight.Black, 
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(top = 12.dp)
                 )
             }
@@ -587,8 +616,8 @@ fun AccountHistoryView(
     if (showActions != null) {
         AlertDialog(
             onDismissRequest = { showActions = null },
-            containerColor = FintechCard,
-            titleContentColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Transaction Options") },
             text = { Text("What to do with this record?", color = Color.Gray) },
             confirmButton = { 
@@ -632,11 +661,11 @@ fun AccountDialog(
         
         AlertDialog(
             onDismissRequest = { showSelectionWindow = false },
-            containerColor = FintechCard,
+            containerColor = MaterialTheme.colorScheme.surface,
             title = { 
                 Text(
                     text = "Select $type", 
-                    color = Color.White, 
+                    color = MaterialTheme.colorScheme.onSurface, 
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
@@ -657,7 +686,7 @@ fun AccountDialog(
                                     showSelectionWindow = false
                                 },
                                 modifier = Modifier.aspectRatio(0.85f),
-                                colors = CardDefaults.cardColors(containerColor = FintechDeepDark),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Column(
@@ -680,7 +709,7 @@ fun AccountDialog(
                                     Spacer(Modifier.height(6.dp))
                                     Text(
                                         text = item.name, 
-                                        color = Color.White, 
+                                        color = MaterialTheme.colorScheme.onSurface, 
                                         fontSize = 9.sp, 
                                         textAlign = TextAlign.Center, 
                                         maxLines = 2,
@@ -704,8 +733,8 @@ fun AccountDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = FintechCard,
-        titleContentColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
         title = { Text(if (account == null) "Add New Account" else "Edit Account", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -722,8 +751,8 @@ fun AccountDialog(
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                             focusedBorderColor = FintechAccent,
                             unfocusedBorderColor = Color.Gray
                         )
@@ -732,11 +761,11 @@ fun AccountDialog(
                     DropdownMenu(
                         expanded = typeExpanded,
                         onDismissRequest = { typeExpanded = false },
-                        modifier = Modifier.background(FintechCard).fillMaxWidth(0.7f)
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth(0.7f)
                     ) {
                         accountTypes.forEach { t ->
                             DropdownMenuItem(
-                                text = { Text(t, color = Color.White) },
+                                text = { Text(t, color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     type = t
                                     typeExpanded = false
@@ -774,8 +803,8 @@ fun AccountDialog(
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                             focusedBorderColor = FintechAccent,
                             unfocusedBorderColor = Color.Gray
                         ),
@@ -789,8 +818,8 @@ fun AccountDialog(
                     label = { Text("Current Balance") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                         focusedBorderColor = FintechAccent,
                         unfocusedBorderColor = Color.Gray
                     )

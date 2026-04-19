@@ -77,14 +77,12 @@ fun HomeTab(
         activeTransactions.filter { it.spentAt in start..end }
     }
 
-    // Dynamic Summary Calculation based on filtered transactions
     val income = remember(filteredTransactions) {
         filteredTransactions.filter { it.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT") }.sumOf { it.amount }
     }
     val expense = remember(filteredTransactions) {
         filteredTransactions.filter { it.type in listOf("EXPENSE", "OTHER") }.sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
     }
-    // Dues are usually an all-time net position, but here we show them for the filtered period if it's "All Time"
     val dues = remember(filteredTransactions) {
         filteredTransactions.sumOf {
             when (it.type) {
@@ -104,7 +102,7 @@ fun HomeTab(
     var showActions by remember { mutableStateOf<TransactionEntity?>(null) }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
@@ -118,13 +116,13 @@ fun HomeTab(
                     Column {
                         Text(
                             text = "Hello, ${userProfile?.username ?: userProfile?.displayName ?: "User"}",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
                         Text(
                             text = if (selectedTimeFilter == TimeFilter.ALL_TIME) "Your net savings" else "Your savings this period",
-                            color = Color.Gray, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
                             fontWeight = FontWeight.Medium, 
                             fontSize = 14.sp
                         )
@@ -166,8 +164,8 @@ fun HomeTab(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { showFilterMenu = true }) {
-                    Text(text = "History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = Color.White)
-                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White)
+                    Text(text = "History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+                    Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.width(8.dp))
                     Text(selectedTimeFilter.label, color = FintechAccent, fontSize = 12.sp)
                 }
@@ -175,11 +173,11 @@ fun HomeTab(
                 DropdownMenu(
                     expanded = showFilterMenu,
                     onDismissRequest = { showFilterMenu = false },
-                    modifier = Modifier.background(FintechCard)
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
                     TimeFilter.entries.forEach { filter ->
                         DropdownMenuItem(
-                            text = { Text(filter.label, color = Color.White) },
+                            text = { Text(filter.label, color = MaterialTheme.colorScheme.onSurface) },
                             onClick = {
                                 selectedTimeFilter = filter
                                 showFilterMenu = false
@@ -197,7 +195,7 @@ fun HomeTab(
         if (selectedTimeFilter == TimeFilter.CUSTOM) {
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = FintechCard),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
@@ -215,9 +213,9 @@ fun HomeTab(
                                 }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
                             },
                             label = { Text(if (tempStartDate == 0L) "From" else SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tempStartDate)), fontSize = 10.sp) },
-                            colors = AssistChipDefaults.assistChipColors(labelColor = Color.White)
+                            colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface)
                         )
-                        Text("to", color = Color.Gray, fontSize = 10.sp)
+                        Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                         AssistChip(
                             onClick = {
                                 val cal = Calendar.getInstance().apply { timeInMillis = tempEndDate }
@@ -227,7 +225,7 @@ fun HomeTab(
                                 }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
                             },
                             label = { Text(SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tempEndDate)), fontSize = 10.sp) },
-                            colors = AssistChipDefaults.assistChipColors(labelColor = Color.White)
+                            colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface)
                         )
                         Spacer(Modifier.weight(1f))
                         IconButton(onClick = { 
@@ -244,7 +242,7 @@ fun HomeTab(
         if (filteredTransactions.isEmpty()) {
             item {
                 Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) {
-                    Text("No transactions found for this period", color = Color.Gray)
+                    Text("No transactions found for this period", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -273,10 +271,10 @@ fun HomeTab(
     if (showActions != null) {
         AlertDialog(
             onDismissRequest = { showActions = null },
-            containerColor = FintechCard,
-            titleContentColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Transaction Options") },
-            text = { Text("What to do with this record?", color = Color.Gray) },
+            text = { Text("What to do with this record?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = { 
                 Button(onClick = { 
                     onEditTransaction(showActions!!)
@@ -311,12 +309,12 @@ fun HomeTab(
 
         AlertDialog(
             onDismissRequest = { showStatementDialog = false },
-            containerColor = FintechCard,
-            titleContentColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Monthly Statements") },
             text = {
                 if (availableMonths.isEmpty()) {
-                    Text("No statements available yet.", color = Color.Gray, textAlign = TextAlign.Center)
+                    Text("No statements available yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                         items(availableMonths) { monthCal ->
@@ -345,7 +343,7 @@ fun HomeTab(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(monthLabel, color = Color.White)
+                                    Text(monthLabel, color = MaterialTheme.colorScheme.onSurface)
                                     Icon(Icons.Default.Visibility, null, tint = FintechAccent, modifier = Modifier.size(18.dp))
                                 }
                             }

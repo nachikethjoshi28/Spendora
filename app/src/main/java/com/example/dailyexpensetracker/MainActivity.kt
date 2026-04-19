@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.example.dailyexpensetracker.data.ExpenseRepository
 import com.example.dailyexpensetracker.data.local.AppDatabase
 import com.example.dailyexpensetracker.ui.screens.ExpenseTrackerScreen
@@ -25,7 +27,9 @@ class MainActivity : ComponentActivity() {
         val viewModel: ExpenseViewModel by viewModels { ExpenseViewModelFactory(repository) }
 
         setContent {
-            SpendoraTheme {
+            val isDarkMode by viewModel.isDarkMode.collectAsState()
+            
+            SpendoraTheme(darkTheme = isDarkMode) {
                 ExpenseTrackerScreen(viewModel)
             }
         }

@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +62,18 @@ fun TransactionItem(
         cal1.get(Calendar.DAY_OF_YEAR) != cal2.get(Calendar.DAY_OF_YEAR) || cal1.get(Calendar.YEAR) != cal2.get(Calendar.YEAR)
     }
 
+    // Determine custom background color for light mode
+    val isDarkMode = MaterialTheme.colorScheme.background == DarkBackground
+    val cardBackground = if (!isDarkMode && !isDeleted) {
+        when {
+            isTransferType -> LightTransferBackground
+            isPositive -> LightIncomeBackground
+            else -> LightExpenseBackground
+        }
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -69,7 +82,7 @@ fun TransactionItem(
                 onLongClick = onLongClick
             ),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = FintechCard)
+        colors = CardDefaults.cardColors(containerColor = cardBackground)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -77,7 +90,7 @@ fun TransactionItem(
                     Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(if (isDeleted) Color.Red.copy(alpha = 0.1f) else FintechDeepDark),
+                        .background(if (isDeleted) Color.Red.copy(alpha = 0.1f) else if (isDarkMode) MaterialTheme.colorScheme.background else Color.White),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -107,14 +120,14 @@ fun TransactionItem(
                     Text(
                         text = if (isDeleted) "CANCELLED" else titleText.toSentenceCase(),
                         fontWeight = FontWeight.Bold,
-                        color = if (isDeleted) ThemeExpense else Color.White,
+                        color = if (isDeleted) ThemeExpense else MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp,
                         textDecoration = if (isDeleted) TextDecoration.LineThrough else null
                     )
                     Text(
                         text = transaction.type.replace("_", " ").toSentenceCase(),
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
@@ -129,14 +142,14 @@ fun TransactionItem(
                     Text(
                         SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(transaction.spentAt)),
                         fontSize = 10.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp).fillMaxWidth()) {
-                    HorizontalDivider(color = Color.Gray.copy(0.1f), modifier = Modifier.padding(bottom = 12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(bottom = 12.dp))
                     
                     DetailRow("Posted on", formatter.format(Date(transaction.createdAt)))
                     if (isPreviousDate) DetailRow("Transaction Date", formatter.format(Date(transaction.spentAt)))
@@ -158,8 +171,8 @@ fun TransactionItem(
                     transaction.note?.let { note ->
                         if (note.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
-                            Text("Note", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            Text(note, color = Color.White, fontSize = 14.sp)
+                            Text("Note", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(note, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
                         }
                     }
                 }
@@ -174,8 +187,8 @@ fun DetailRow(label: String, value: String) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = Color.Gray, fontSize = 12.sp)
-        Text(value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Text(value, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -183,11 +196,11 @@ fun DetailRow(label: String, value: String) {
 fun MiniFlowCard(label: String, amount: Double, color: Color, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = FintechCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "$${"%.0f".format(abs(amount))}",
@@ -203,7 +216,7 @@ fun MiniFlowCard(label: String, amount: Double, color: Color, modifier: Modifier
 fun SectionHeader(title: String) {
     Text(
         text = title,
-        color = Color.White,
+        color = MaterialTheme.colorScheme.onBackground,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.ExtraBold,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
@@ -215,17 +228,17 @@ fun FintechInput(value: String, label: String, onValueChange: (String) -> Unit) 
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(label, color = Color.Gray, fontSize = 16.sp) },
+        placeholder = { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) },
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+        textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            focusedContainerColor = FintechCard,
-            unfocusedContainerColor = FintechCard,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             focusedBorderColor = Color.Transparent,
             unfocusedBorderColor = Color.Transparent
         )
@@ -233,16 +246,16 @@ fun FintechInput(value: String, label: String, onValueChange: (String) -> Unit) 
 }
 
 @Composable
-fun FintechChoiceChip(label: String, selected: Boolean, modifier: Modifier = Modifier, selectedColor: Color = Color.White, onClick: () -> Unit) {
+fun FintechChoiceChip(label: String, selected: Boolean, modifier: Modifier = Modifier, selectedColor: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = if (selected) selectedColor.copy(alpha = 0.15f) else Color.Transparent,
-        border = BorderStroke(1.dp, if (selected) selectedColor else Color.Gray.copy(alpha = 0.2f)),
+        border = BorderStroke(1.dp, if (selected) selectedColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
         modifier = modifier
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 14.dp)) {
-            Text(text = label, color = if (selected) selectedColor else Color.Gray, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 11.sp)
+            Text(text = label, color = if (selected) selectedColor else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 11.sp)
         }
     }
 }
@@ -258,25 +271,25 @@ fun FintechDropdown(options: List<Pair<String, String>>, selectedId: String?, pl
             readOnly = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+            textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
             colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = Color.White,
-                disabledContainerColor = FintechCard,
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 disabledBorderColor = Color.Transparent,
-                disabledLabelColor = Color.Gray
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
             enabled = false,
-            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) }
+            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         )
         Box(modifier = Modifier.matchParentSize().clickable { expanded = true })
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(FintechCard).fillMaxWidth(0.8f)
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth(0.8f)
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option.second, color = Color.White) },
+                    text = { Text(option.second, color = MaterialTheme.colorScheme.onSurface) },
                     onClick = { onSelected(option.first); expanded = false }
                 )
             }
@@ -294,11 +307,11 @@ fun FintechAutocompleteInput(value: String, suggestions: List<String>, onValueCh
             expanded = expanded && value.isNotEmpty() && filtered.isNotEmpty(),
             onDismissRequest = { expanded = false },
             properties = PopupProperties(focusable = false),
-            modifier = Modifier.background(FintechCard).fillMaxWidth(0.8f)
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth(0.8f)
         ) {
             filtered.forEach { suggestion ->
                 DropdownMenuItem(
-                    text = { Text(suggestion.toSentenceCase(), color = Color.White) },
+                    text = { Text(suggestion.toSentenceCase(), color = MaterialTheme.colorScheme.onSurface) },
                     onClick = { onValueChange(suggestion); expanded = false }
                 )
             }
@@ -309,15 +322,15 @@ fun FintechAutocompleteInput(value: String, suggestions: List<String>, onValueCh
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryGridSelector(
-    title: String = "Select Expense Subcategory",
+    title: String = "Select Sub-Category",
     categories: List<CategoryEntity>,
     onCategorySelected: (CategoryEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = FintechCard,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) }
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) }
     ) {
         Column(
             modifier = Modifier
@@ -328,7 +341,7 @@ fun CategoryGridSelector(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
@@ -345,7 +358,7 @@ fun CategoryGridSelector(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = FintechDeepDark,
+                            color = MaterialTheme.colorScheme.background,
                             modifier = Modifier.size(56.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -360,7 +373,7 @@ fun CategoryGridSelector(
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = cat.name.toSentenceCase(),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center,
                             maxLines = 1
@@ -385,8 +398,8 @@ fun SubCategoryGridSelector(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = FintechCard,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) }
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) }
     ) {
         Column(
             modifier = Modifier
@@ -402,7 +415,7 @@ fun SubCategoryGridSelector(
                     text = "Secondary Subcategory",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 
                 IconButton(onClick = { showAddSubDialog = true }) {
@@ -412,7 +425,7 @@ fun SubCategoryGridSelector(
 
             if (subCategories.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(200.dp), Alignment.Center) {
-                    Text("No options available. Click + to add.", color = Color.Gray)
+                    Text("No options available. Click + to add.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyVerticalGrid(
@@ -428,7 +441,7 @@ fun SubCategoryGridSelector(
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = FintechDeepDark,
+                                color = MaterialTheme.colorScheme.background,
                                 modifier = Modifier.size(56.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -443,7 +456,7 @@ fun SubCategoryGridSelector(
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 text = sub.name.toSentenceCase(),
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 11.sp,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1
@@ -459,8 +472,8 @@ fun SubCategoryGridSelector(
         var name by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showAddSubDialog = false },
-            containerColor = FintechCard,
-            titleContentColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("New Detail") },
             text = { FintechInput(name, "Name (e.g. Walmart, Target)") { name = it } },
             confirmButton = { 

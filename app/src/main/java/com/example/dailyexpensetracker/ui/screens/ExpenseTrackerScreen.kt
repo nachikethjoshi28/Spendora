@@ -106,13 +106,13 @@ fun MainScaffold(viewModel: ExpenseViewModel) {
         }
     }
 
-    Surface(color = FintechDeepDark, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             bottomBar = {
                 NavigationBar(
-                    containerColor = FintechCard,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 8.dp,
                     modifier = Modifier.clip(RoundedCornerShape(24.dp))
                 ) {
@@ -141,7 +141,7 @@ fun MainScaffold(viewModel: ExpenseViewModel) {
                                             Icon(
                                                 Icons.Default.Add,
                                                 contentDescription = title,
-                                                tint = if (selectedTab == 2) Color.White else Color.Gray,
+                                                tint = if (selectedTab == 2) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(24.dp)
                                             )
                                         }
@@ -161,8 +161,8 @@ fun MainScaffold(viewModel: ExpenseViewModel) {
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = FintechAccent,
                                 selectedTextColor = FintechAccent,
-                                unselectedIconColor = Color.Gray,
-                                unselectedTextColor = Color.Gray,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 indicatorColor = Color.Transparent
                             )
                         )
@@ -215,9 +215,7 @@ fun AddTransactionScreen(
     var type by remember(editingTransaction) { mutableStateOf(editingTransaction?.type ?: "EXPENSE") }
     var amount by remember(editingTransaction) { mutableStateOf(editingTransaction?.amount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
     
-    // categoryId stores the "Expense Subcategory" (Groceries, etc.)
     var categoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.categoryId) }
-    // subCategoryId stores the "Secondary Subcategory" (Walmart, etc.)
     var subCategoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.subCategoryId) }
     
     var accountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.accountId) }
@@ -254,18 +252,18 @@ fun AddTransactionScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().background(FintechDeepDark).padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(24.dp))
-        Text(text = if (editingTransaction == null) "Add Transaction" else "Edit Transaction", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(text = if (editingTransaction == null) "Add Transaction" else "Edit Transaction", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         
         Spacer(Modifier.height(32.dp))
 
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = FintechCard), shape = RoundedCornerShape(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Transaction Type", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Transaction Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     
                     TextButton(onClick = {
                         DatePickerDialog(context, { _, year, month, day ->
@@ -275,7 +273,7 @@ fun AddTransactionScreen(
                     }) {
                         Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(16.dp), tint = FintechAccent)
                         Spacer(Modifier.width(4.dp))
-                        Text(SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)), color = Color.White, fontSize = 12.sp)
+                        Text(SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -299,7 +297,7 @@ fun AddTransactionScreen(
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Primary Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Primary Category", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 val primaryCategories = when(mainType) {
@@ -336,13 +334,13 @@ fun AddTransactionScreen(
 
         if (mainType == "Spent" && type == "EXPENSE") {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Checkbox(checked = isSplit, onCheckedChange = { isSplit = it }, colors = CheckboxDefaults.colors(checkedColor = FintechAccent, uncheckedColor = Color.Gray))
-                Text("Split with Friend", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Checkbox(checked = isSplit, onCheckedChange = { isSplit = it }, colors = CheckboxDefaults.colors(checkedColor = FintechAccent, uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
+                Text("Split with Friend", color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
             if (isSplit) {
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = FintechCard), shape = RoundedCornerShape(16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Split Logic", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Split Logic", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("EQUAL", "PERCENT", "AMOUNT").forEach { st ->
                                 FilterChip(
@@ -363,7 +361,7 @@ fun AddTransactionScreen(
             }
 
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("Expense Subcategory", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                Text("Expense Subcategory", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                 
                 Box(modifier = Modifier.fillMaxWidth().clickable { showCategorySheet = true }) {
                     OutlinedTextField(
@@ -372,16 +370,16 @@ fun AddTransactionScreen(
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) },
+                        textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = FintechCard,
-                            unfocusedContainerColor = FintechCard,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent,
-                            disabledContainerColor = FintechCard,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             disabledBorderColor = Color.Transparent,
-                            disabledTextColor = Color.White
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         enabled = false
                     )
@@ -390,7 +388,7 @@ fun AddTransactionScreen(
 
             if (categoryId != null) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Text("Secondary Subcategory", color = if (categoryId == "Miscellaneous") FintechAccent else Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                    Text("Secondary Subcategory", color = if (categoryId == "Miscellaneous") FintechAccent else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                     
                     Box(modifier = Modifier.fillMaxWidth().clickable { showSubCategorySheet = true }) {
                         OutlinedTextField(
@@ -399,16 +397,16 @@ fun AddTransactionScreen(
                             readOnly = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray) },
+                            textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = FintechCard,
-                                unfocusedContainerColor = FintechCard,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
-                                disabledContainerColor = FintechCard,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 disabledBorderColor = Color.Transparent,
-                                disabledTextColor = Color.White
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             enabled = false
                         )
@@ -423,12 +421,12 @@ fun AddTransactionScreen(
         }
 
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            Text(if (mainType == "Card Payment") "Pay From (Account)" else "Account", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+            Text(if (mainType == "Card Payment") "Pay From (Account)" else "Account", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(modifier = Modifier.weight(1f)) {
                     FintechDropdown(accounts.map { it.id to it.name.toSentenceCase() }, accountId, "Select Account") { accountId = it }
                 }
-                IconButton(onClick = { showAddAccountDialog = true }, modifier = Modifier.size(56.dp).clip(CircleShape).background(FintechCard)) {
+                IconButton(onClick = { showAddAccountDialog = true }, modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
                     Icon(Icons.Default.AccountBalanceWallet, null, tint = FintechAccent)
                 }
             }
@@ -436,7 +434,7 @@ fun AddTransactionScreen(
 
         if (mainType == "Card Payment") {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("Pay To (Credit Card)", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                Text("Pay To (Credit Card)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                 FintechDropdown(accounts.map { it.id to it.name.toSentenceCase() }, toAccountId, "Select Account") { toAccountId = it }
             }
         }
@@ -499,11 +497,13 @@ fun AddTransactionScreen(
     }
 
     if (showSubCategorySheet) {
-        val currentSubCategories by viewModel.subCategories.collectAsState()
+        val currentSubCategories by viewModel.allSubCategories.collectAsState()
+        val filteredSubCategories = currentSubCategories.filter { it.categoryId == categoryId }
+        
         SubCategoryGridSelector(
             viewModel = viewModel,
             categoryId = categoryId ?: "",
-            subCategories = currentSubCategories,
+            subCategories = filteredSubCategories,
             onSubCategorySelected = { 
                 subCategoryId = it.name
                 showSubCategorySheet = false

@@ -33,11 +33,18 @@ class ExpenseViewModel(
 ) : ViewModel() {
 
     private val _currentUid = MutableStateFlow(Firebase.auth.currentUser?.uid)
+    
+    private val _isDarkMode = MutableStateFlow(true)
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
     init {
         viewModelScope.launch {
             repository.initializeDefaultCategories()
         }
+    }
+
+    fun toggleTheme() {
+        _isDarkMode.value = !_isDarkMode.value
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

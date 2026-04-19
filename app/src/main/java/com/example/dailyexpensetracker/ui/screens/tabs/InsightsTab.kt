@@ -96,11 +96,11 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(24.dp))
-        Text("Insights", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White, modifier = Modifier.fillMaxWidth())
+        Text("Insights", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.fillMaxWidth())
         
         // Unified Filter Menu
         Row(
@@ -112,8 +112,8 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { showFilterMenu = true }
                 ) {
-                    Text("Filter", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White)
+                    Text("Filter", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.width(8.dp))
                     Text(selectedTimeFilter.label, color = FintechAccent, fontSize = 12.sp)
                 }
@@ -121,11 +121,11 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                 DropdownMenu(
                     expanded = showFilterMenu,
                     onDismissRequest = { showFilterMenu = false },
-                    modifier = Modifier.background(FintechCard)
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                 ) {
                     TimeFilter.entries.forEach { filter ->
                         DropdownMenuItem(
-                            text = { Text(filter.label, color = Color.White) },
+                            text = { Text(filter.label, color = MaterialTheme.colorScheme.onSurface) },
                             onClick = {
                                 selectedTimeFilter = filter
                                 showFilterMenu = false
@@ -145,14 +145,14 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                     appliedStartDate = 0L
                     appliedEndDate = System.currentTimeMillis()
                 }) {
-                    Icon(Icons.Default.Refresh, "Reset", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Refresh, "Reset", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 }
             }
         }
 
         if (selectedTimeFilter == TimeFilter.CUSTOM) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = FintechCard),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
@@ -170,9 +170,9 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
                         },
                         label = { Text(if (tempStartDate == 0L) "From" else SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tempStartDate)), fontSize = 10.sp) },
-                        colors = AssistChipDefaults.assistChipColors(labelColor = Color.White)
+                        colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface)
                     )
-                    Text("to", color = Color.Gray, fontSize = 10.sp)
+                    Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                     AssistChip(
                         onClick = {
                             val cal = Calendar.getInstance().apply { timeInMillis = tempEndDate }
@@ -182,7 +182,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
                         },
                         label = { Text(SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tempEndDate)), fontSize = 10.sp) },
-                        colors = AssistChipDefaults.assistChipColors(labelColor = Color.White)
+                        colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { 
@@ -197,7 +197,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
         // 1. Line Graph
         SectionHeader("Trends")
-        Card(colors = CardDefaults.cardColors(containerColor = FintechCard), shape = RoundedCornerShape(16.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = showIncomeLine, onClick = { showIncomeLine = !showIncomeLine }, label = { Text("Income", fontSize = 10.sp) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = ThemeIncome.copy(0.2f), selectedLabelColor = ThemeIncome))
@@ -211,24 +211,24 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
         // 2. Expense Pie
         Spacer(Modifier.height(24.dp))
         SectionHeader("Expenses Distribution")
-        Card(colors = CardDefaults.cardColors(containerColor = FintechCard), shape = RoundedCornerShape(16.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
             InteractivePieChart(data = expensePieData, modifier = Modifier.padding(16.dp), customColors = AestheticColors)
         }
 
         // 3. Income/Expense Bar Chart
         Spacer(Modifier.height(24.dp))
         SectionHeader("Monthly Overview")
-        Card(colors = CardDefaults.cardColors(containerColor = FintechCard), shape = RoundedCornerShape(16.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
             IncomeExpenseBarChart(data = lineData, modifier = Modifier.padding(16.dp).fillMaxWidth().height(250.dp))
         }
 
         // 4. Friends Pies
         Spacer(Modifier.height(24.dp))
         SectionHeader("Friend Balances")
-        Card(colors = CardDefaults.cardColors(containerColor = FintechCard), shape = RoundedCornerShape(16.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 InteractivePieChart(data = receivePieData, modifier = Modifier.padding(bottom = 24.dp), customColors = GreenShades, label = "To Receive")
-                HorizontalDivider(color = Color.Gray.copy(0.1f), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
                 InteractivePieChart(data = repayPieData, customColors = RedShades, label = "To Repay")
             }
         }
