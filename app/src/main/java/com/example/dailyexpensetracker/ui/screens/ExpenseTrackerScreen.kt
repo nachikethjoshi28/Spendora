@@ -3,10 +3,13 @@ package com.example.dailyexpensetracker.ui.screens
 import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -14,10 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dailyexpensetracker.data.local.TransactionEntity
@@ -93,7 +98,6 @@ fun MainScaffold(viewModel: ExpenseViewModel) {
     val tabs = listOf("Home", "Insights", "Add", "Friends", "Profile")
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Collect all subcategories to keep the Firestore listener alive
     val allSubs by viewModel.allSubCategories.collectAsState()
 
     BackHandler(enabled = selectedTab != 0) {
@@ -214,10 +218,8 @@ fun AddTransactionScreen(
     
     var type by remember(editingTransaction) { mutableStateOf(editingTransaction?.type ?: "EXPENSE") }
     var amount by remember(editingTransaction) { mutableStateOf(editingTransaction?.amount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
-    
     var categoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.categoryId) }
     var subCategoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.subCategoryId) }
-    
     var accountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.accountId) }
     var toAccountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.toAccountId) }
     var isSplit by remember(editingTransaction) { mutableStateOf(editingTransaction?.isSplit ?: false) }
