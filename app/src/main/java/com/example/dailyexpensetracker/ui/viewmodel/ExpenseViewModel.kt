@@ -126,8 +126,9 @@ class ExpenseViewModel(
 
     val friendBalances: StateFlow<List<FriendBalance>> = transactions.map { list ->
         list.filter { it.status != "DELETED" && !it.friendName.isNullOrBlank() }
-            .groupBy { it.friendName!! }
-            .map { (name, txs) ->
+            .groupBy { it.friendName!!.trim().lowercase() } // Normalize for grouping
+            .map { (lowerName, txs) ->
+                val displayName = txs.first().friendName!!.trim() // Use original casing from first record
                 val balance = txs.sumOf {
                     when (it.type) {
                         "LENT" -> it.amount
@@ -138,7 +139,7 @@ class ExpenseViewModel(
                         else -> 0.0
                     }
                 }
-                FriendBalance(name, balance)
+                FriendBalance(displayName, balance)
             }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -159,14 +160,19 @@ class ExpenseViewModel(
                 cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear
             }
 
+            // Inflows: Salary, Received debt, Borrowed debt, Gifts
             val income = currentMonthTransactions.filter { 
-                it.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT") 
+                it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT") 
             }.sumOf { it.amount }
 
+            // Outflows: Expenses (user part), Lent money, Repaid debt, Others
             val expense = currentMonthTransactions.filter { 
-                it.type in listOf("EXPENSE", "OTHER")
-            }.sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
+                it.type in listOf("EXPENSE", "OTHER", "LENT", "REPAID")
+            }.sumOf { 
+                if (it.type == "EXPENSE" && it.isSplit) it.amount - it.splitAmount else it.amount 
+            }
 
+            // Net Dues (what others owe me minus what I owe others)
             val dues = activeTxs.sumOf {
                 when (it.type) {
                     "LENT" -> it.amount

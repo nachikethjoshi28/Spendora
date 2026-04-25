@@ -3,25 +3,27 @@ package com.example.dailyexpensetracker.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Premium Fintech Palette - Light
-val BluePrimary = Color(0xFF007AFF)
-val BlueSecondary = Color(0xFF5856D6)
+val BluePrimary = Color(0xFF2D4ADE)        // Deep royal indigo — premium fintech primary
+val BlueSecondary = Color(0xFF5856D6)      // Indigo (also used in dark mode)
 val SuccessGreen = Color(0xFF34C759)
 val ErrorRed = Color(0xFFFF3B30)
 val WarningYellow = Color(0xFFFFCC00)
 val NeutralGray = Color(0xFF8E8E93)
 
-// Pastel Palette for Light Mode
-val PastelPeach = Color(0xFFFFDAB9)
-val PastelOrange = Color(0xFFFFCCBC)
-val PastelBlue = Color(0xFFB3E5FC)
-val LightSurface = Color(0xFFFAFAFA)
-val LightBackground = Color(0xFFFFFFFF)
-val LightCard = Color(0xFFF5F5F5)
+// Pastel Palette for Light Mode (refined rose-gold gradient stops)
+val PastelPeach = Color(0xFFFFE0C2)
+val PastelOrange = Color(0xFFFFC8A8)
+val PastelBlue = Color(0xFFCFE3FF)
 
-// Transaction Specific Backgrounds (Light Mode)
-val LightIncomeBackground = Color(0xFFE8F5E9) // Light Green
-val LightExpenseBackground = Color(0xFFFFEBEE) // Light Red
-val LightTransferBackground = Color(0xFFE0F7FA) // Light Cyan
+// Premium Light Surfaces — soft warm off-white background, pure-white surfaces, subtle cool-tint cards
+val LightBackground = Color(0xFFF6F7FB)    // Soft warm off-white (page bg)
+val LightSurface = Color(0xFFFFFFFF)       // Pure white (cards / sheets)
+val LightCard = Color(0xFFEEF1F8)          // Subtle cool-tint card / surfaceVariant
+
+// Transaction Specific Backgrounds (Light Mode) — semantics preserved (green / red / cyan)
+val LightIncomeBackground = Color(0xFFE3F6E8)   // Refined fresh mint
+val LightExpenseBackground = Color(0xFFFFE6E8)  // Refined soft rose
+val LightTransferBackground = Color(0xFFE4F0FB) // Refined soft sky
 
 // Premium Fintech Palette - Dark
 val DarkPrimary = Color(0xFF0A84FF)

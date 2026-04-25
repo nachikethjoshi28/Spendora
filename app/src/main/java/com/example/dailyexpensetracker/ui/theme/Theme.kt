@@ -25,18 +25,28 @@ private val DarkColorScheme = darkColorScheme(
 
 private val LightColorScheme = lightColorScheme(
     primary = BluePrimary,
-    secondary = PastelPeach,
-    tertiary = SuccessGreen,
-    background = LightBackground,
-    surface = LightSurface,
     onPrimary = Color.White,
-    onSecondary = Color.Black,
+    primaryContainer = Color(0xFFE0E7FF),          // Soft indigo tint for filled accents
+    onPrimaryContainer = Color(0xFF0F1A52),        // Deep ink on indigo tint
+    secondary = BlueSecondary,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE6E5FF),
+    onSecondaryContainer = Color(0xFF1F1D54),
+    tertiary = SuccessGreen,
     onTertiary = Color.White,
-    onBackground = Color.Black,
-    onSurface = Color.Black,
-    error = ErrorRed,
+    background = LightBackground,
+    onBackground = Color(0xFF1A1D29),              // Rich slate ink (premium, not pure black)
+    surface = LightSurface,
+    onSurface = Color(0xFF1A1D29),
     surfaceVariant = LightCard,
-    onSurfaceVariant = Color.Gray
+    onSurfaceVariant = Color(0xFF5D6275),          // Refined slate for secondary text
+    outline = Color(0xFFD4D7E0),                   // Subtle hairline borders
+    outlineVariant = Color(0xFFE6E8EF),
+    error = ErrorRed,
+    onError = Color.White,
+    errorContainer = Color(0xFFFFE6E8),
+    onErrorContainer = Color(0xFF7A0E14),
+    scrim = Color(0xFF1A1D29)
 )
 
 @Composable
@@ -68,4 +78,4 @@ val MaterialTheme.fintechCard: Color
 
 val MaterialTheme.fintechSurface: Color
     @Composable
-    get() = if (colorScheme.background == DarkBackground) Color(0xFF2C2C2E) else Color(0xFFEEEEEE)
+    get() = if (colorScheme.background == DarkBackground) Color(0xFF2C2C2E) else Color(0xFFEEF1F8)
