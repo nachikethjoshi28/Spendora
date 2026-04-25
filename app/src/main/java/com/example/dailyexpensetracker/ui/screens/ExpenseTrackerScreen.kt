@@ -291,7 +291,7 @@ fun AddTransactionScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Transaction Details", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                Text("Transaction Details", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                 Surface(
                     onClick = {
                         DatePickerDialog(context, { _, year, month, day ->
@@ -300,7 +300,7 @@ fun AddTransactionScreen(
                         }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
                     },
                     shape = RoundedCornerShape(10.dp),
-                    color = FintechSurface
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -310,7 +310,7 @@ fun AddTransactionScreen(
                         Icon(Icons.Default.CalendarMonth, null, tint = FintechAccent, modifier = Modifier.size(14.dp))
                         Text(
                             SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)),
-                            color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium
+                            color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -349,7 +349,7 @@ fun AddTransactionScreen(
                             subCategoryId = null
                         },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected) chipColor.copy(0.15f) else FintechSurface,
+                        color = if (isSelected) chipColor.copy(0.15f) else MaterialTheme.colorScheme.surfaceVariant,
                         border = BorderStroke(1.dp, if (isSelected) chipColor else Color.Transparent),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -364,7 +364,7 @@ fun AddTransactionScreen(
                             }
                             Text(
                                 mt, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                color = if (isSelected) chipColor else Color.Gray
+                                color = if (isSelected) chipColor else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -381,7 +381,7 @@ fun AddTransactionScreen(
 
             if (subTypes.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                Text("Sub-type", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Text("Sub-type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     subTypes.forEach { st ->
@@ -398,8 +398,8 @@ fun AddTransactionScreen(
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = FintechAccent.copy(0.18f),
                                 selectedLabelColor = FintechAccent,
-                                containerColor = FintechSurface,
-                                labelColor = Color.Gray
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true, selected = type == st,
@@ -416,7 +416,7 @@ fun AddTransactionScreen(
 
         // ── Total Amount UI (From Snippet UI) ──
         SectionCard {
-            Text("Amount", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+            Text("Amount", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
             Spacer(Modifier.height(10.dp))
 
             val amountColor = when (mainType) {
@@ -431,11 +431,12 @@ fun AddTransactionScreen(
                 BasicTextField(
                     value = amount,
                     onValueChange = { v -> if (v.matches(Regex("^\\d*\\.?\\d{0,2}\$"))) amount = v },
-                    textStyle = TextStyle(color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black),
+                    textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 36.sp, fontWeight = FontWeight.Black),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(amountColor),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     decorationBox = { inner ->
                         Box {
-                            if (amount.isEmpty()) Text("0.00", color = Color.Gray.copy(0.4f), fontSize = 36.sp, fontWeight = FontWeight.Black)
+                            if (amount.isEmpty()) Text("0.00", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f), fontSize = 36.sp, fontWeight = FontWeight.Black)
                             inner()
                         }
                     },
@@ -450,11 +451,11 @@ fun AddTransactionScreen(
                     Surface(
                         onClick = { amount = q },
                         shape = RoundedCornerShape(8.dp),
-                        color = if (amount == q) amountColor.copy(0.15f) else FintechSurface,
+                        color = if (amount == q) amountColor.copy(0.15f) else MaterialTheme.colorScheme.surfaceVariant,
                         border = BorderStroke(1.dp, if (amount == q) amountColor.copy(0.4f) else Color.Transparent)
                     ) {
                         Text(
-                            "$$q", color = if (amount == q) amountColor else Color.Gray,
+                            "$$q", color = if (amount == q) amountColor else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp, fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
@@ -472,8 +473,8 @@ fun AddTransactionScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Split with Friend", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        Text("Share this expense", color = Color.Gray, fontSize = 12.sp)
+                        Text("Split with Friend", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("Share this expense", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                     Switch(
                         checked = isSplit,
@@ -484,10 +485,10 @@ fun AddTransactionScreen(
 
                 AnimatedVisibility(visible = isSplit, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                     Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Split with", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Split with", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         FintechAutocompleteInput(friendName, friendSuggestions, { friendName = it }, "Friend Name")
 
-                        Text("Split method", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Split method", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf("EQUAL", "PERCENTAGE", "AMOUNT").forEach { st ->
                                 FilterChip(
@@ -509,14 +510,14 @@ fun AddTransactionScreen(
                         }
 
                         if (totalAmtVal > 0) {
-                            Card(colors = CardDefaults.cardColors(containerColor = FintechSurface), shape = RoundedCornerShape(10.dp)) {
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(10.dp)) {
                                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                        Text("Your share", color = Color.Gray, fontSize = 12.sp)
+                                        Text("Your share", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                         Text("$%.2f".format(totalAmtVal - computedSplitAmt), color = ThemeExpense, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     }
                                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                        Text("${friendName.toSentenceCase().ifBlank { "Friend" }}'s share", color = Color.Gray, fontSize = 12.sp)
+                                        Text("${friendName.toSentenceCase().ifBlank { "Friend" }}'s share", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                         Text("$%.2f".format(computedSplitAmt), color = FintechAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     }
                                 }
@@ -695,16 +696,18 @@ fun AddTransactionScreen(
     }
 }
 
-// ── Helper composable: section card (From Snippet) ──
+// ── Helper composable: section card (theme-aware, premium feel) ──
 
 @Composable
 private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = FintechCard),
-        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             content()
         }
     }

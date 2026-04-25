@@ -6,17 +6,22 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -107,45 +112,113 @@ fun HomeTab(
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
         item {
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
+            // Premium hero balance card — soft accent gradient, refined typography
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                FintechAccent.copy(alpha = 0.10f),
+                                savingsColor.copy(alpha = 0.06f),
+                                MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                FintechAccent.copy(alpha = 0.25f),
+                                savingsColor.copy(alpha = 0.15f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(28.dp)
+                    )
+                    .padding(20.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Hello, ${userProfile?.username ?: userProfile?.displayName ?: "User"}",
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 20.sp,
+                                letterSpacing = (-0.3).sp
+                            )
+                            Text(
+                                text = if (selectedTimeFilter == TimeFilter.ALL_TIME) "Your net savings" else "Your savings this period",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        // Premium "Statements" pill button — filled tonal with subtle accent
+                        Surface(
+                            onClick = { showStatementDialog = true },
+                            shape = RoundedCornerShape(14.dp),
+                            color = FintechAccent.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, FintechAccent.copy(alpha = 0.30f))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
+                            ) {
+                                Icon(Icons.Default.Description, null, tint = FintechAccent, modifier = Modifier.size(14.dp))
+                                Text("Statements", color = FintechAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "Hello, ${userProfile?.username ?: userProfile?.displayName ?: "User"}",
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
+                            text = if (savings >= 0) "$" else "-$",
+                            color = savingsColor.copy(alpha = 0.75f),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(bottom = 6.dp, end = 2.dp)
                         )
                         Text(
-                            text = if (selectedTimeFilter == TimeFilter.ALL_TIME) "Your net savings" else "Your savings this period",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                            fontWeight = FontWeight.Medium, 
-                            fontSize = 14.sp
+                            text = "%,.2f".format(kotlin.math.abs(savings)),
+                            color = savingsColor,
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = (-1).sp
                         )
                     }
-                    
-                    OutlinedButton(
-                        onClick = { showStatementDialog = true },
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, FintechAccent.copy(alpha = 0.5f)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Icons.Default.Description, null, tint = FintechAccent, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Statements", color = FintechAccent, fontSize = 12.sp)
+
+                    if (savings >= 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            Icon(imageVector = Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = ThemeIncome, modifier = Modifier.size(13.dp))
+                            Text(
+                                "Saving steadily",
+                                color = ThemeIncome,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            Icon(imageVector = Icons.AutoMirrored.Filled.TrendingDown, contentDescription = null, tint = ThemeExpense, modifier = Modifier.size(13.dp))
+                            Text(
+                                "Spending exceeds income",
+                                color = ThemeExpense,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
-                
-                Text(
-                    text = "$${"%.2f".format(savings)}",
-                    color = savingsColor,
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Black
-                )
             }
         }
 
@@ -291,42 +364,101 @@ fun HomeTab(
     }
 
     if (showStatementDialog) {
+        // Statements are released on the 1st of the following month.
+        // i.e. April's statement is generated on May 1st — so we only list months that have already ENDED.
         val availableMonths = remember(activeTransactions) {
             val months = mutableListOf<Calendar>()
             if (activeTransactions.isEmpty()) return@remember emptyList()
-            
-            val firstTxDate = activeTransactions.minOfOrNull { it.spentAt } ?: System.currentTimeMillis()
-            val firstMonth = Calendar.getInstance().apply { timeInMillis = firstTxDate; set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0) }
-            val currentMonth = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0) }
-            
-            val temp = currentMonth.clone() as Calendar
-            while (!temp.before(firstMonth)) {
-                months.add(temp.clone() as Calendar)
-                temp.add(Calendar.MONTH, -1)
+
+            val firstTxDate = activeTransactions.minOf { it.spentAt }
+            val firstMonth = Calendar.getInstance().apply {
+                timeInMillis = firstTxDate
+                set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }
+            // Start from the PREVIOUS calendar month — current month's statement is not yet "generated".
+            val cursor = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                add(Calendar.MONTH, -1)
+            }
+            while (!cursor.before(firstMonth)) {
+                months.add(cursor.clone() as Calendar)
+                cursor.add(Calendar.MONTH, -1)
             }
             months
+        }
+
+        // For the placeholder telling the user when their first statement will appear
+        val nextStatementLabel = remember {
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1); add(Calendar.MONTH, 1)
+            }
+            SimpleDateFormat("MMMM 1, yyyy", Locale.getDefault()).format(cal.time)
         }
 
         AlertDialog(
             onDismissRequest = { showStatementDialog = false },
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text("Monthly Statements") },
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(FintechAccent.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Description, null, tint = FintechAccent, modifier = Modifier.size(18.dp))
+                    }
+                    Column {
+                        Text("Monthly Statements", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                        Text("Released on the 1st of every month", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                    }
+                }
+            },
             text = {
                 if (availableMonths.isEmpty()) {
-                    Text("No statements available yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(FintechAccent.copy(alpha = 0.08f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.HourglassEmpty, null, tint = FintechAccent, modifier = Modifier.size(28.dp))
+                        }
+                        Text("No statements yet", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
+                        Text(
+                            "Your first statement will be available on $nextStatementLabel.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         items(availableMonths) { monthCal ->
                             val monthLabel = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(monthCal.time)
-                            TextButton(
-                                onClick = {
-                                    val start = monthCal.timeInMillis
-                                    val end = (monthCal.clone() as Calendar).apply { add(Calendar.MONTH, 1); add(Calendar.MILLISECOND, -1) }.timeInMillis
-                                    val monthTx = activeTransactions.filter { it.spentAt in start..end }
-                                    
+                            val start = monthCal.timeInMillis
+                            val end = (monthCal.clone() as Calendar).apply { add(Calendar.MONTH, 1); add(Calendar.MILLISECOND, -1) }.timeInMillis
+                            val monthTx = activeTransactions.filter { it.spentAt in start..end }
+                            val monthSpent = monthTx
+                                .filter { it.type in listOf("EXPENSE", "OTHER") }
+                                .sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable {
                                     scope.launch {
-                                        generateCombinedPdf(context, "Spendora_Statement_$monthLabel", monthTx, categoryMap.mapValues { it.value.name }, accountMap.mapValues { it.value.name }) { uri: android.net.Uri ->
+                                        generateCombinedPdf(
+                                            context,
+                                            "Spendora_Statement_$monthLabel",
+                                            monthTx,
+                                            categoryMap.mapValues { it.value.name },
+                                            accountMap.mapValues { it.value.name }
+                                        ) { uri: android.net.Uri ->
                                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                                 setDataAndType(uri, "application/pdf")
                                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -340,18 +472,37 @@ fun HomeTab(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, FintechAccent.copy(alpha = 0.18f))
                             ) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(monthLabel, color = MaterialTheme.colorScheme.onSurface)
-                                    Icon(Icons.Default.Visibility, null, tint = FintechAccent, modifier = Modifier.size(18.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(FintechAccent.copy(alpha = 0.12f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.PictureAsPdf, null, tint = FintechAccent, modifier = Modifier.size(20.dp))
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(monthLabel, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(
+                                            "${monthTx.size} transactions  ·  $${"%.0f".format(monthSpent)} spent",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Icon(Icons.Default.ChevronRight, null, tint = FintechAccent, modifier = Modifier.size(20.dp))
                                 }
                             }
                         }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showStatementDialog = false }) { Text("Close") } }
+            confirmButton = { TextButton(onClick = { showStatementDialog = false }) { Text("Close", color = FintechAccent) } }
         )
     }
 }

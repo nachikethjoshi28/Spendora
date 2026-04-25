@@ -311,11 +311,30 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Health Score Card ──────────────────────────────────────────
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
+            // ── Health Score Card (premium gradient) ───────────────────────
+            val healthAccent = when {
+                savingsRate >= 0.3f -> ThemeIncome
+                savingsRate >= 0.1f -> Color(0xFFFFD60A)
+                savings < 0 -> ThemeExpense
+                else -> FintechAccent
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                healthAccent.copy(alpha = 0.10f),
+                                MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = healthAccent.copy(alpha = 0.20f),
+                        shape = RoundedCornerShape(20.dp)
+                    )
             ) {
                 Row(
                     modifier = Modifier.padding(20.dp).fillMaxWidth(),

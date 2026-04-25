@@ -257,15 +257,28 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
 
 @Composable
 private fun NetCard(label: String, amount: Double, color: Color, modifier: Modifier = Modifier) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = color.copy(0.1f)),
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, color.copy(0.2f)),
+    Box(
         modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(color.copy(alpha = 0.16f), color.copy(alpha = 0.06f))
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = color.copy(alpha = 0.28f),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text(label, color = color.copy(0.8f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Text("$%.2f".format(amount), color = color, fontWeight = FontWeight.Black, fontSize = 18.sp)
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+                Text(label, color = color.copy(alpha = 0.85f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
+            }
+            Spacer(Modifier.height(2.dp))
+            Text("$%,.2f".format(amount), color = color, fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = (-0.5).sp)
         }
     }
 }

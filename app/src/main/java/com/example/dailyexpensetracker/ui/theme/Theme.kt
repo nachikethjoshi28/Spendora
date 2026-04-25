@@ -20,7 +20,9 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = Color.White,
     error = ErrorRed,
     surfaceVariant = FintechSurface,
-    onSurfaceVariant = Color.Gray
+    onSurfaceVariant = Color.Gray,
+    outline = Color(0xFF3A3A3C),                   // Subtle hairline borders in dark
+    outlineVariant = Color(0xFF2C2C2E)
 )
 
 private val LightColorScheme = lightColorScheme(
