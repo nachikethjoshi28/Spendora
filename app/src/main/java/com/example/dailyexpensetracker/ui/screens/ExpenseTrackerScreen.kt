@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -97,8 +98,6 @@ fun MainScaffold(viewModel: ExpenseViewModel) {
     
     val tabs = listOf("Home", "Insights", "Add", "Friends", "Profile")
     val snackbarHostState = remember { SnackbarHostState() }
-
-    val allSubs by viewModel.allSubCategories.collectAsState()
 
     BackHandler(enabled = selectedTab != 0) {
         selectedTab = 0
@@ -206,11 +205,14 @@ fun AddTransactionScreen(
     onSave: () -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
+    val isEditing = editingTransaction != null
+
+    // -- State hybridization --
     var mainType by remember(editingTransaction) { 
         mutableStateOf(when(editingTransaction?.type) {
             "EXPENSE", "REPAID", "OTHER" -> "Spent"
             "SALARY", "RECEIVED", "GIFT" -> "Received"
-            "BILL PAYMENT", "LOAD GIFT CARD", "SELF_TRANSFER" -> "Card Payment"
+            "BILL PAYMENT", "LOAD GIFT CARD" -> "Card Payment"
             "LENT", "BORROWED" -> "Debts & Loans"
             else -> "Spent"
         })
@@ -219,9 +221,7 @@ fun AddTransactionScreen(
     var type by remember(editingTransaction) { mutableStateOf(editingTransaction?.type ?: "EXPENSE") }
     var amount by remember(editingTransaction) { mutableStateOf(editingTransaction?.amount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
     
-    // categoryId stores the "Category" (formerly Expense Subcategory)
     var categoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.categoryId) }
-    // subCategoryId stores the "Sub Category" (formerly Secondary Subcategory)
     var subCategoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.subCategoryId) }
     
     var accountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.accountId) }
@@ -237,7 +237,14 @@ fun AddTransactionScreen(
 
     val accounts by viewModel.accounts.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
-    val existingFriends = remember(friendBalances) { friendBalances.map { it.friendName }.distinct() }
+    val friends by viewModel.friends.collectAsState()
+
+    // Friend suggestions from snippet
+    val friendSuggestions = remember(friends, friendBalances) {
+        val fromFriends = friends.map { it.nickname }
+        val fromHistory = friendBalances.map { it.friendName }
+        (fromFriends + fromHistory).distinct().sorted()
+    }
     
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -247,6 +254,7 @@ fun AddTransactionScreen(
     var showCategorySheet by remember { mutableStateOf(false) }
     var showSubCategorySheet by remember { mutableStateOf(false) }
 
+    // Original local categories list
     val expenseSubCategories = listOf(
         "Housing", "Utilities", "Groceries", "Govt Services", "Dining Out",
         "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity",
@@ -257,115 +265,270 @@ fun AddTransactionScreen(
         viewModel.selectCategory(categoryId)
     }
 
+    // Computed split amount from snippet
+    val totalAmtVal = amount.toDoubleOrNull() ?: 0.0
+    val computedSplitAmt = when (splitType) {
+        "EQUAL" -> totalAmtVal / 2.0
+        "PERCENTAGE" -> totalAmtVal * (splitRatio.toDoubleOrNull() ?: 50.0) / 100.0
+        "AMOUNT" -> friendsShareInput.toDoubleOrNull() ?: 0.0
+        else -> 0.0
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Original Header UI
         Spacer(Modifier.height(24.dp))
-        Text(text = if (editingTransaction == null) "Add Transaction" else "Edit Transaction", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Text(text = if (isEditing) "Edit Transaction" else "Add Transaction", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         
         Spacer(Modifier.height(32.dp))
 
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Transaction Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    
-                    TextButton(onClick = {
+        // ── Transaction Type Card (From Snippet UI) ──
+        SectionCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Transaction Details", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                Surface(
+                    onClick = {
                         DatePickerDialog(context, { _, year, month, day ->
                             calendar.set(year, month, day)
                             spentAt = calendar.timeInMillis
                         }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
-                    }) {
-                        Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(16.dp), tint = FintechAccent)
-                        Spacer(Modifier.width(4.dp))
-                        Text(SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = FintechSurface
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarMonth, null, tint = FintechAccent, modifier = Modifier.size(14.dp))
+                        Text(
+                            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)),
+                            color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium
+                        )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                val mainTypes = listOf("Spent", "Received", "Card Payment", "Debts & Loans")
-                FlowRow(maxItemsInEachRow = 2, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    mainTypes.forEach { mt ->
-                        FintechChoiceChip(label = mt, selected = mt == mainType, modifier = Modifier.weight(1f), selectedColor = FintechAccent) { 
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            val mainTypes = listOf("Spent", "Received", "Card Payment", "Debts & Loans")
+            FlowRow(
+                maxItemsInEachRow = 2,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                mainTypes.forEach { mt ->
+                    val isSelected = mt == mainType
+                    val chipColor = when (mt) {
+                        "Spent" -> ThemeExpense
+                        "Received" -> ThemeIncome
+                        "Card Payment" -> Color(0xFF64D2FF)
+                        "Debts & Loans" -> Color(0xFFBF5AF2)
+                        else -> FintechAccent
+                    }
+                    Surface(
+                        onClick = {
                             mainType = mt
-                            type = when(mt) {
+                            type = when (mt) {
                                 "Spent" -> "EXPENSE"
                                 "Received" -> "SALARY"
-                                "Card Payment" -> "BILL PAYMENT"
+                                "Card Payment" -> "BILL_PAYMENT"
                                 "Debts & Loans" -> "LENT"
                                 else -> "EXPENSE"
                             }
                             isSplit = false
                             categoryId = null
                             subCategoryId = null
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) chipColor.copy(0.15f) else FintechSurface,
+                        border = BorderStroke(1.dp, if (isSelected) chipColor else Color.Transparent),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, null, tint = chipColor, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            Text(
+                                mt, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                                color = if (isSelected) chipColor else Color.Gray
+                            )
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Sub Transaction Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                val subTransactionTypes = when(mainType) {
-                    "Spent" -> listOf("EXPENSE", "REPAID", "OTHER")
-                    "Received" -> listOf("SALARY", "RECEIVED", "GIFT")
-                    "Debts & Loans" -> listOf("LENT", "BORROWED")
-                    "Card Payment" -> listOf("BILL PAYMENT", "LOAD GIFT CARD")
-                    else -> emptyList()
-                }
-                
-                if (subTransactionTypes.isNotEmpty()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        subTransactionTypes.forEach { st ->
-                            FilterChip(
-                                selected = type == st,
-                                onClick = { 
-                                    type = st 
-                                    if (type != "EXPENSE") {
-                                        categoryId = null
-                                        subCategoryId = null
-                                    }
-                                },
-                                label = { Text(st.replace("_", " "), fontSize = 10.sp) },
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent)
+            }
+
+            val subTypes = when (mainType) {
+                "Spent" -> listOf("EXPENSE", "REPAID", "OTHER")
+                "Received" -> listOf("SALARY", "RECEIVED", "GIFT")
+                "Debts & Loans" -> listOf("LENT", "BORROWED")
+                "Card Payment" -> listOf("BILL PAYMENT", "LOAD GIFT CARD")
+                else -> emptyList()
+            }
+
+            if (subTypes.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text("Sub-type", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    subTypes.forEach { st ->
+                        FilterChip(
+                            selected = type == st,
+                            onClick = { 
+                                type = st 
+                                if (type != "EXPENSE") {
+                                    categoryId = null
+                                    subCategoryId = null
+                                }
+                            },
+                            label = { Text(st.replace("_", " "), fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FintechAccent.copy(0.18f),
+                                selectedLabelColor = FintechAccent,
+                                containerColor = FintechSurface,
+                                labelColor = Color.Gray
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true, selected = type == st,
+                                borderColor = Color.Transparent,
+                                selectedBorderColor = FintechAccent.copy(0.4f)
                             )
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Total Amount UI (From Snippet UI) ──
+        SectionCard {
+            Text("Amount", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+            Spacer(Modifier.height(10.dp))
+
+            val amountColor = when (mainType) {
+                "Spent" -> ThemeExpense
+                "Received" -> ThemeIncome
+                else -> FintechAccent
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$", color = amountColor, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(6.dp))
+                BasicTextField(
+                    value = amount,
+                    onValueChange = { v -> if (v.matches(Regex("^\\d*\\.?\\d{0,2}\$"))) amount = v },
+                    textStyle = TextStyle(color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    decorationBox = { inner ->
+                        Box {
+                            if (amount.isEmpty()) Text("0.00", color = Color.Gray.copy(0.4f), fontSize = 36.sp, fontWeight = FontWeight.Black)
+                            inner()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            val quickAmounts = listOf("10", "25", "50", "100", "200")
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                quickAmounts.forEach { q ->
+                    Surface(
+                        onClick = { amount = q },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (amount == q) amountColor.copy(0.15f) else FintechSurface,
+                        border = BorderStroke(1.dp, if (amount == q) amountColor.copy(0.4f) else Color.Transparent)
+                    ) {
+                        Text(
+                            "$$q", color = if (amount == q) amountColor else Color.Gray,
+                            fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Split with Friend UI & Logic (From Snippet) ──
+        if (mainType == "Spent" && type == "EXPENSE") {
+            Spacer(Modifier.height(16.dp))
+            SectionCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Split with Friend", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("Share this expense", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Switch(
+                        checked = isSplit,
+                        onCheckedChange = { isSplit = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = FintechAccent)
+                    )
+                }
+
+                AnimatedVisibility(visible = isSplit, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                    Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Split with", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        FintechAutocompleteInput(friendName, friendSuggestions, { friendName = it }, "Friend Name")
+
+                        Text("Split method", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("EQUAL", "PERCENTAGE", "AMOUNT").forEach { st ->
+                                FilterChip(
+                                    selected = splitType == st,
+                                    onClick = { splitType = st },
+                                    label = { Text(st.lowercase().replaceFirstChar { it.titlecase() }, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = FintechAccent.copy(0.18f),
+                                        selectedLabelColor = FintechAccent
+                                    )
+                                )
+                            }
+                        }
+
+                        if (splitType == "PERCENTAGE") {
+                            FintechInput(splitRatio, "Friend's share %") { splitRatio = it }
+                        } else if (splitType == "AMOUNT") {
+                            FintechInput(friendsShareInput, "Friend's share amount ($)") { friendsShareInput = it }
+                        }
+
+                        if (totalAmtVal > 0) {
+                            Card(colors = CardDefaults.cardColors(containerColor = FintechSurface), shape = RoundedCornerShape(10.dp)) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                        Text("Your share", color = Color.Gray, fontSize = 12.sp)
+                                        Text("$%.2f".format(totalAmtVal - computedSplitAmt), color = ThemeExpense, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                        Text("${friendName.toSentenceCase().ifBlank { "Friend" }}'s share", color = Color.Gray, fontSize = 12.sp)
+                                        Text("$%.2f".format(computedSplitAmt), color = FintechAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(24.dp))
-        FintechInput(amount, "Total Amount ($)") { amount = it }
-
+        // ── Original Category Selection ──
         if (mainType == "Spent" && type == "EXPENSE") {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Checkbox(checked = isSplit, onCheckedChange = { isSplit = it }, colors = CheckboxDefaults.colors(checkedColor = FintechAccent, uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
-                Text("Split with Friend", color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            }
-            if (isSplit) {
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Split Logic", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("EQUAL", "PERCENT", "AMOUNT").forEach { st ->
-                                FilterChip(
-                                    selected = splitType == (if (st == "PERCENT") "PERCENTAGE" else st), 
-                                    onClick = { splitType = (if (st == "PERCENT") "PERCENTAGE" else st) }, 
-                                    label = { Text(st, fontSize = 10.sp) }, 
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                        if (splitType == "PERCENTAGE") {
-                            FintechInput(splitRatio, "Friend's share %") { splitRatio = it }
-                        } else if (splitType == "AMOUNT") {
-                            FintechInput(friendsShareInput, "Friend's share amount ($)") { friendsShareInput = it }
-                        }
-                    }
-                }
-            }
-
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("Category", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                 
@@ -421,11 +584,12 @@ fun AddTransactionScreen(
             }
         }
 
-        if (isSplit || mainType == "Debts & Loans" || type == "REPAID" || type == "RECEIVED") {
+        if (!isSplit && (mainType == "Debts & Loans" || type == "REPAID" || type == "RECEIVED")) {
             Spacer(Modifier.height(8.dp))
-            FintechAutocompleteInput(friendName, existingFriends, { friendName = it }, "Friend Name")
+            FintechAutocompleteInput(friendName, friendSuggestions, { friendName = it }, "Friend Name")
         }
 
+        // ── Original Account Selection ──
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Text(if (mainType == "Card Payment") "Pay From (Account)" else "Account", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -445,56 +609,64 @@ fun AddTransactionScreen(
             }
         }
 
+        // ── Original Note ──
         FintechInput(note, "Note (Optional)") { note = it }
 
         Spacer(Modifier.height(32.dp))
+
+        // ── Original Save Button Logic ──
         Button(
             onClick = {
-                val totalAmt = amount.toDoubleOrNull() ?: 0.0
-                if (totalAmt <= 0) { scope.launch { snackbarHostState.showSnackbar("Invalid amount") }; return@Button }
+                if (totalAmtVal <= 0) { scope.launch { snackbarHostState.showSnackbar("Invalid amount") }; return@Button }
                 
                 if (mainType == "Spent" && type == "EXPENSE" && categoryId == "Miscellaneous" && subCategoryId.isNullOrBlank()) {
                     scope.launch { snackbarHostState.showSnackbar("Sub Category is mandatory for Miscellaneous") }
                     return@Button
                 }
 
-                var calSplitAmt = 0.0
-                if (isSplit) {
-                    calSplitAmt = when (splitType) {
-                        "EQUAL" -> totalAmt / 2.0
-                        "PERCENTAGE" -> (totalAmt * (splitRatio.toDoubleOrNull() ?: 50.0)) / 100.0
-                        "AMOUNT" -> friendsShareInput.toDoubleOrNull() ?: 0.0
-                        else -> 0.0
-                    }
+                // Snippet functionality: Look up friend's uid
+                val friendEntity = viewModel.friends.value.find { f ->
+                    f.nickname.equals(friendName.trim(), ignoreCase = true) ||
+                    f.username?.equals(friendName.trim(), ignoreCase = true) == true
                 }
 
                 val tx = TransactionEntity(
-                    id = editingTransaction?.id ?: UUID.randomUUID().toString(), amount = totalAmt, type = type,
-                    categoryId = categoryId, subCategoryId = subCategoryId, accountId = accountId, toAccountId = toAccountId,
-                    isSplit = isSplit, splitAmount = calSplitAmt, splitType = splitType, splitRatio = splitRatio,
+                    id = editingTransaction?.id ?: UUID.randomUUID().toString(), 
+                    amount = totalAmtVal, 
+                    type = type,
+                    categoryId = categoryId, 
+                    subCategoryId = subCategoryId, 
+                    accountId = accountId, 
+                    toAccountId = toAccountId,
+                    isSplit = isSplit, 
+                    splitAmount = if (isSplit) computedSplitAmt else 0.0, 
+                    splitType = if (isSplit) splitType else null, 
+                    splitRatio = if (isSplit) splitRatio else null,
                     friendName = friendName.trim().toSentenceCase().ifBlank { null },
+                    friendUid = friendEntity?.uid, // snippet functionality
                     note = note.ifBlank { null }?.toSentenceCase(), 
                     spentAt = spentAt, 
                     createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
                     status = "ACTIVE"
                 )
-                if (editingTransaction != null) viewModel.updateTransaction(tx) else viewModel.addTransaction(tx)
+                if (isEditing) viewModel.updateTransaction(tx) else viewModel.addTransaction(tx)
                 onSave()
             },
             modifier = Modifier.fillMaxWidth().height(60.dp),
             colors = ButtonDefaults.buttonColors(containerColor = FintechAccent), shape = RoundedCornerShape(16.dp)
         ) {
-            Text("Save Transaction", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
+            Text(if (isEditing) "Update Transaction" else "Save Transaction", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
         }
         Spacer(Modifier.height(120.dp))
     }
 
+    // Original Sheets and Dialogs logic
     if (showCategorySheet) {
         CategoryGridSelector(
             title = "Select Category",
             categories = expenseSubCategories,
             onCategorySelected = { 
-                if (categoryId != it.id) subCategoryId = null // Clear secondary if primary changes
+                if (categoryId != it.id) subCategoryId = null
                 categoryId = it.id
                 showCategorySheet = false
             },
@@ -520,5 +692,20 @@ fun AddTransactionScreen(
 
     if (showAddAccountDialog) {
         AccountDialog(onDismiss = { showAddAccountDialog = false }, onConfirm = { n, b, t -> viewModel.addAccount(n, b, t); showAddAccountDialog = false })
+    }
+}
+
+// ── Helper composable: section card (From Snippet) ──
+
+@Composable
+private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = FintechCard),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            content()
+        }
     }
 }
