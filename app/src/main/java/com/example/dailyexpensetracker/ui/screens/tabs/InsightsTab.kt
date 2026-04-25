@@ -35,7 +35,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     val transactions by viewModel.transactions.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
-    val categoryMap = categories.associateBy { it.id }
     val context = LocalContext.current
 
     // ── Filter state ──────────────────────────────────────────────────────────
@@ -78,10 +77,10 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     val savings = totalIncome - totalExpense
     val savingsRate = if (totalIncome > 0) (savings / totalIncome).toFloat() else 0f
 
-    val expensePieData = remember(activeTx, categoryMap) {
+    // Updated grouping logic to use "categoryId" (the primary Category name)
+    val expensePieData = remember(activeTx) {
         activeTx.filter { it.type in listOf("EXPENSE", "OTHER") }
-            .groupBy { it.categoryId }
-            .mapKeys { (id, _) -> categoryMap[id]?.name ?: "Other" }
+            .groupBy { it.categoryId ?: "Miscellaneous" }
             .mapValues { (_, list) -> list.sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount } }
             .filter { it.value > 0 }
     }
@@ -134,6 +133,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
     ) {
         // ── Hero Header ───────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                 .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color(0xFF0D1117), Color(0xFF0D1117).copy(0f))
+                        listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background.copy(alpha = 0f))
                     )
                 )
         ) {
@@ -157,7 +157,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                             "Insights",
                             fontSize = 30.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                             letterSpacing = (-0.5).sp
                         )
                         Text(
@@ -173,7 +173,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                         Surface(
                             onClick = { showFilterMenu = true },
                             shape = RoundedCornerShape(12.dp),
-                            color = FintechCard,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier
                         ) {
                             Row(
@@ -181,15 +181,15 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Default.FilterList, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Text("Filter", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Default.FilterList, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                                Text("Filter", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
                         DropdownMenu(
                             expanded = showFilterMenu,
                             onDismissRequest = { showFilterMenu = false },
-                            modifier = Modifier.background(Color(0xFF1C1C1E))
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                         ) {
                             TimeFilter.entries.forEach { filter ->
                                 DropdownMenuItem(
@@ -199,7 +199,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                                                 Box(Modifier.size(6.dp).background(FintechAccent, CircleShape))
                                             else
                                                 Spacer(Modifier.size(6.dp))
-                                            Text(filter.label, color = if (selectedTimeFilter == filter) FintechAccent else Color.White)
+                                            Text(filter.label, color = if (selectedTimeFilter == filter) FintechAccent else MaterialTheme.colorScheme.onSurface)
                                         }
                                     },
                                     onClick = {
@@ -223,7 +223,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                     exit = fadeOut() + shrinkVertically()
                 ) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = FintechCard),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.padding(top = 12.dp)
                     ) {
@@ -249,7 +249,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                                         fontSize = 11.sp
                                     )
                                 },
-                                colors = AssistChipDefaults.assistChipColors(labelColor = Color.White, containerColor = FintechSurface)
+                                colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface, containerColor = MaterialTheme.colorScheme.surface)
                             )
                             Text("→", color = Color.Gray)
                             AssistChip(
@@ -263,7 +263,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                                 label = {
                                     Text(SimpleDateFormat("dd MMM yy", Locale.getDefault()).format(Date(tempEndDate)), fontSize = 11.sp)
                                 },
-                                colors = AssistChipDefaults.assistChipColors(labelColor = Color.White, containerColor = FintechSurface)
+                                colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface, containerColor = MaterialTheme.colorScheme.surface)
                             )
                             Spacer(Modifier.weight(1f))
                             FilledTonalButton(
@@ -311,9 +311,9 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Gauge + Savings Rate ──────────────────────────────────────────
+            // ── Health Score Card ──────────────────────────────────────────
             Card(
-                colors = CardDefaults.cardColors(containerColor = FintechCard),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -331,7 +331,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                             savings < 0 -> "Overspending ⚠️"
                             else -> "Break Even"
                         }
-                        Text(healthLabel, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(healthLabel, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             "${(savingsRate * 100).toInt()}% savings rate",
@@ -416,7 +416,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                         )
                         Text(
                             "${(savingsRate * 100).toInt()}%",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Black,
                             fontSize = 15.sp
                         )
@@ -483,7 +483,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Who Owes You / Who You Owe ────────────────────────────────────
+            // ── Friend Balances ────────────────────────────────────
             InsightSection(
                 title = "Friend Balances",
                 subtitle = if (totalToReceive > 0 || totalToRepay > 0)
@@ -520,7 +520,7 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                         }
 
                         if (receivePieData.isNotEmpty() && repayPieData.isNotEmpty()) {
-                            HorizontalDivider(color = Color.White.copy(0.06f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                         }
 
                         // To Repay
@@ -556,8 +556,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     }
 }
 
-// ── Reusable sub-composables ──────────────────────────────────────────────────
-
 @Composable
 private fun InsightSection(
     title: String,
@@ -572,7 +570,7 @@ private fun InsightSection(
         ) {
             Text(
                 title,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 17.sp
             )
@@ -581,7 +579,7 @@ private fun InsightSection(
             }
         }
         Card(
-            colors = CardDefaults.cardColors(containerColor = FintechCard),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -614,7 +612,7 @@ private fun KpiCard(
             Spacer(Modifier.height(6.dp))
             Text(
                 "${"%.0f".format(abs(amount))}",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Black,
                 fontSize = 16.sp
             )
@@ -667,7 +665,7 @@ private fun ProgressRow(label: String, value: Double, total: Double, color: Colo
         Spacer(Modifier.height(3.dp))
         Box(
             Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(0.07f))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
         ) {
             Box(
                 Modifier.fillMaxWidth(fraction).fillMaxHeight()

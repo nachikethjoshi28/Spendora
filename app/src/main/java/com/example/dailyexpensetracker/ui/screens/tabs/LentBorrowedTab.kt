@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.dailyexpensetracker.data.local.AccountEntity
+import com.example.dailyexpensetracker.data.local.FriendEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.data.local.UserEntity
 import com.example.dailyexpensetracker.ui.screens.*
@@ -43,103 +45,152 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
     val friends by viewModel.friends.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
     val accountMap = accounts.associateBy { it.id }
-    
+
     var selectedFriend by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var showAddFriendDialog by remember { mutableStateOf(false) }
     var showFriendsListDialog by remember { mutableStateOf(false) }
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
-    
     var fabExpanded by remember { mutableStateOf(false) }
 
     val filteredBalances = remember(friendBalances, searchQuery) {
         if (searchQuery.isBlank()) friendBalances
         else friendBalances.filter { it.friendName.contains(searchQuery, ignoreCase = true) }
     }
-    
-    BackHandler(enabled = selectedFriend != null) {
-        selectedFriend = null
-    }
+
+    val totalOwedToYou = friendBalances.filter { it.balance > 0 }.sumOf { it.balance }
+    val totalYouOwe = friendBalances.filter { it.balance < 0 }.sumOf { abs(it.balance) }
+
+    BackHandler(enabled = selectedFriend != null) { selectedFriend = null }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (selectedFriend == null) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Spacer(Modifier.height(16.dp))
-                
-                // Search Bar + My Friends Icon besides it
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search friends...", color = Color.Gray) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            cursorColor = FintechAccent,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
-                        singleLine = true
+                // Header
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)) {
+                    Text(
+                        "Friends",
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     
-                    Spacer(Modifier.width(8.dp))
-                    
-                    // "My Friends" option besides the search bar
-                    IconButton(onClick = { showFriendsListDialog = true }) {
-                        Icon(Icons.Default.People, contentDescription = "My Friends", tint = FintechAccent, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(16.dp))
+
+                    // Search Bar + My Friends Icon
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search friends…", color = Color.Gray, fontSize = 14.sp) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedBorderColor = FintechAccent.copy(0.5f),
+                                unfocusedBorderColor = Color.Transparent,
+                                cursorColor = FintechAccent,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(18.dp)) },
+                            singleLine = true
+                        )
+                        
+                        Spacer(Modifier.width(8.dp))
+                        
+                        Surface(
+                            onClick = { showFriendsListDialog = true },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.People,
+                                    contentDescription = "My Friends",
+                                    tint = FintechAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (totalOwedToYou > 0 || totalYouOwe > 0) {
+                        Spacer(Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (totalOwedToYou > 0) {
+                                NetCard(
+                                    label = "You'll receive",
+                                    amount = totalOwedToYou,
+                                    color = ThemeIncome,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (totalYouOwe > 0) {
+                                NetCard(
+                                    label = "You owe",
+                                    amount = totalYouOwe,
+                                    color = ThemeExpense,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
                     }
                 }
 
+                // Friends List
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
+                    contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
                     if (filteredBalances.isEmpty()) {
                         item {
                             Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) {
-                                Text("No friend records", color = Color.Gray)
+                                Text(if (searchQuery.isEmpty()) "No activity yet" else "No match found", color = Color.Gray)
                             }
                         }
                     }
                     items(filteredBalances) { item ->
+                        val isPositive = item.balance >= 0
+                        val color = if (isPositive) ThemeIncome else ThemeExpense
+                        val friendEntity = friends.find { f -> f.nickname.equals(item.friendName, ignoreCase = true) }
+
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable { selectedFriend = item.friendName },
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            border = BorderStroke(1.dp, color.copy(0.12f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                modifier = Modifier.padding(14.dp).fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val friendEntity = friends.find { f -> f.nickname.equals(item.friendName, ignoreCase = true) }
-                                Box(contentAlignment = Alignment.BottomEnd) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        modifier = Modifier.size(48.dp),
-                                        border = BorderStroke(2.dp, if (item.balance >= 0) ThemeIncome else ThemeExpense),
-                                        color = if (MaterialTheme.colorScheme.background == DarkBackground) Color.DarkGray else Color.LightGray
-                                    ) {
-                                        if (friendEntity?.profilePictureUri != null) {
-                                            AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(friendEntity.profilePictureUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                                        } else {
-                                            Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.padding(8.dp))
+                                Surface(shape = CircleShape, modifier = Modifier.size(48.dp), color = color.copy(0.12f)) {
+                                    if (!friendEntity?.profilePictureUri.isNullOrEmpty()) {
+                                        AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(friendEntity!!.profilePictureUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                                    } else {
+                                        Box(Modifier.fillMaxSize(), Alignment.Center) {
+                                            Text(item.friendName.firstOrNull()?.uppercaseChar()?.toString() ?: "?", color = color, fontWeight = FontWeight.Black, fontSize = 20.sp)
                                         }
                                     }
                                 }
                                 Spacer(Modifier.width(16.dp))
-                                Text(item.friendName.toSentenceCase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                                val color = if (item.balance >= 0) ThemeIncome else ThemeExpense
-                                Text(text = "$${"%.2f".format(abs(item.balance))}", color = color, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(item.friendName.toSentenceCase(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(if (isPositive) "owes you" else "you owe", color = Color.Gray, fontSize = 12.sp)
+                                }
+                                Text(text = "$${"%.2f".format(abs(item.balance))}", color = color, fontWeight = FontWeight.Black, fontSize = 17.sp)
+                                Icon(Icons.Default.ChevronRight, null, tint = Color.Gray.copy(0.4f), modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -159,17 +210,17 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                         modifier = Modifier.padding(bottom = 16.dp)
                     ) {
                         Column(modifier = Modifier.padding(8.dp)) {
-                            FabMenuItem(Icons.Default.PersonAdd, "Add Friend") { 
+                            FabMenuItem(Icons.Default.PersonAdd, "ADD FRIEND") { 
                                 fabExpanded = false
                                 showAddFriendDialog = true
                             }
                             HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
-                            FabMenuItem(Icons.Default.MonetizationOn, "Split Expense") { 
+                            FabMenuItem(Icons.Default.MonetizationOn, "SPLIT EXPENSE") { 
                                 fabExpanded = false
                                 showAddExpenseDialog = true
                             }
                             HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
-                            FabMenuItem(Icons.Default.GroupAdd, "Create Group") { 
+                            FabMenuItem(Icons.Default.GroupAdd, "CREATE GROUP") { 
                                 fabExpanded = false
                                 showGroupDialog = true
                             }
@@ -181,7 +232,8 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                     onClick = { fabExpanded = !fabExpanded },
                     containerColor = FintechAccent,
                     contentColor = Color.White,
-                    shape = CircleShape
+                    shape = CircleShape,
+                    modifier = Modifier.size(56.dp)
                 ) {
                     Icon(if (fabExpanded) Icons.Default.Close else Icons.Default.Add, contentDescription = null)
                 }
@@ -204,12 +256,28 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
 }
 
 @Composable
+private fun NetCard(label: String, amount: Double, color: Color, modifier: Modifier = Modifier) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = color.copy(0.1f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, color.copy(0.2f)),
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(label, color = color.copy(0.8f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Text("$%.2f".format(amount), color = color, fontWeight = FontWeight.Black, fontSize = 18.sp)
+        }
+    }
+}
+
+@Composable
 fun AddFriendDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
     var contact by remember { mutableStateOf("") }
     var nickname by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var foundUser by remember { mutableStateOf<UserEntity?>(null) }
     val scope = rememberCoroutineScope()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -229,6 +297,8 @@ fun AddFriendDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = FintechAccent,
+                            unfocusedBorderColor = Color.Gray.copy(0.3f),
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -288,9 +358,9 @@ fun FriendsListDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
             if (friends.isEmpty()) { 
                 Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { Text("No friends added yet", color = Color.Gray) }
             } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(friends) { friend ->
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Surface(shape = CircleShape, modifier = Modifier.size(44.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                                 if (!friend.profilePictureUri.isNullOrEmpty()) {
                                     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(friend.profilePictureUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
@@ -313,7 +383,122 @@ fun FriendsListDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
 
 @Composable
 fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface, titleContentColor = MaterialTheme.colorScheme.onSurface, title = { Text("Split Expense") }, text = { Text("Splitting expenses is coming soon!", color = Color.Gray) }, confirmButton = { Button(onClick = onDismiss) { Text("OK") } })
+    val friends by viewModel.friends.collectAsState()
+    val accounts by viewModel.accounts.collectAsState()
+    val friendBalances by viewModel.friendBalances.collectAsState()
+    val friendOptions = remember(friends, friendBalances) { (friends.map { it.nickname } + friendBalances.map { it.friendName }).distinct() }
+    
+    var amount by remember { mutableStateOf("") }
+    var selectedFriend by remember { mutableStateOf(friendOptions.firstOrNull() ?: "") }
+    var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id) }
+    var splitType by remember { mutableStateOf("EQUAL") }
+    var splitRatio by remember { mutableStateOf("50") }
+    var friendShareAmount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var youPaid by remember { mutableStateOf(true) }
+
+    val totalAmount = amount.toDoubleOrNull() ?: 0.0
+    val friendShare = when (splitType) {
+        "EQUAL" -> totalAmount / 2.0
+        "PERCENTAGE" -> totalAmount * (splitRatio.toDoubleOrNull() ?: 50.0) / 100.0
+        "AMOUNT" -> friendShareAmount.toDoubleOrNull() ?: 0.0
+        else -> totalAmount / 2.0
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(36.dp).background(Color(0xFFFFD60A).copy(0.15f), CircleShape), Alignment.Center) {
+                    Icon(Icons.Default.Receipt, null, tint = Color(0xFFFFD60A), modifier = Modifier.size(18.dp))
+                }
+                Text("Split Expense", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Who paid?", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = youPaid, onClick = { youPaid = true }, label = { Text("I paid") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent))
+                    FilterChip(selected = !youPaid, onClick = { youPaid = false }, label = { Text("Friend paid") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = ThemeExpense.copy(0.2f), selectedLabelColor = ThemeExpense))
+                }
+                FintechInput(amount, "Total Amount ($)") { amount = it }
+                
+                Text("Split with", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                if (friendOptions.isNotEmpty()) {
+                    FintechDropdown(friendOptions.map { it to it }, selectedFriend) { selectedFriend = it }
+                }
+
+                Text("How to split?", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("EQUAL", "PERCENTAGE", "AMOUNT").forEach { st ->
+                        FilterChip(
+                            selected = splitType == st,
+                            onClick = { splitType = st },
+                            label = { Text(st.lowercase().replaceFirstChar { it.titlecase() }) },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent)
+                        )
+                    }
+                }
+
+                if (splitType == "PERCENTAGE") {
+                    FintechInput(splitRatio, "Friend's share %") { splitRatio = it }
+                }
+                if (splitType == "AMOUNT") {
+                    FintechInput(friendShareAmount, "Friend's share ($)") { friendShareAmount = it }
+                }
+
+                if (totalAmount > 0) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(10.dp)) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                Text("Your share", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                                Text("$%.2f".format(totalAmount - friendShare), color = FintechAccent, fontWeight = FontWeight.Bold)
+                            }
+                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                Text("${selectedFriend.ifBlank { "Friend" }}\u0027s share", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                                Text("$%.2f".format(friendShare), color = Color(0xFFFFD60A), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                if (accounts.isNotEmpty()) {
+                    Text("From Account", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    FintechDropdown(accounts.map { it.id to it.name }, selectedAccountId) { selectedAccountId = it }
+                }
+                FintechInput(note, "Note (Optional)") { note = it }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    if (totalAmount > 0 && selectedFriend.isNotBlank()) {
+                        val friendEnt = viewModel.friends.value.find { f -> f.nickname.equals(selectedFriend, ignoreCase = true) }
+                        val tx = TransactionEntity(
+                            amount = totalAmount,
+                            type = if (youPaid) "EXPENSE" else "BORROWED",
+                            accountId = selectedAccountId,
+                            isSplit = youPaid,
+                            splitAmount = friendShare,
+                            splitType = splitType,
+                            splitRatio = if (splitType == "PERCENTAGE") splitRatio else null,
+                            friendName = selectedFriend.toSentenceCase(),
+                            friendUid = friendEnt?.uid,
+                            note = note.ifBlank { "Quick Split" },
+                            status = "ACTIVE"
+                        )
+                        viewModel.addTransaction(tx)
+                    }
+                    onDismiss() 
+                },
+                enabled = amount.isNotBlank() && selectedFriend.isNotBlank()
+            ) { Text("Add Expense") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -331,19 +516,38 @@ fun FriendDetailView(friendName: String, viewModel: ExpenseViewModel, accountMap
     val friendTxs = transactions.filter { it.friendName?.equals(friendName, ignoreCase = true) == true && it.status != "DELETED" }
     var showActions by remember { mutableStateOf<TransactionEntity?>(null) }
     val color = if (balanceValue >= 0) ThemeIncome else ThemeExpense
+
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
-            Text(friendName.toSentenceCase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
-            Spacer(Modifier.weight(1f))
-            Text(text = "$${"%.2f".format(abs(balanceValue))}", color = color, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(color.copy(0.1f), Color.Transparent)))) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
+                Row(modifier = Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = CircleShape, modifier = Modifier.size(56.dp), color = color.copy(0.15f)) {
+                        Box(contentAlignment = Alignment.Center) { Text(friendName.firstOrNull()?.uppercaseChar()?.toString() ?: "?", color = color, fontWeight = FontWeight.Black, fontSize = 24.sp) }
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(friendName.toSentenceCase(), fontWeight = FontWeight.Black, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            if (abs(balanceValue) < 0.01) "All settled" 
+                            else if (balanceValue >= 0) "Owes you $${"%.2f".format(balanceValue)}" 
+                            else "You owe $${"%.2f".format(abs(balanceValue))}",
+                            color = color, fontWeight = FontWeight.Bold, fontSize = 14.sp
+                        )
+                    }
+                }
+            }
         }
-        if (friendTxs.isEmpty()) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No transactions yet", color = Color.Gray) } }
-        else {
+        if (friendTxs.isEmpty()) {
+            Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No transactions yet", color = Color.Gray) }
+        } else {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
                 items(friendTxs) { tx -> TransactionItem(tx, (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase(), accountMap[tx.accountId]?.name ?: "Unknown", onLongClick = { if (tx.status != "DELETED") showActions = tx }) }
             }
         }
+    }
+    if (showActions != null) {
+        AlertDialog(onDismissRequest = { showActions = null }, containerColor = MaterialTheme.colorScheme.surface, titleContentColor = MaterialTheme.colorScheme.onSurface, title = { Text("Transaction Options") }, text = { Text("What would you like to do?", color = Color.Gray) }, confirmButton = { Button(onClick = { onEditTransaction(showActions!!); showActions = null }, colors = ButtonDefaults.buttonColors(containerColor = FintechAccent)) { Text("Edit") } }, dismissButton = { TextButton(onClick = { viewModel.deleteTransaction(showActions!!.id); showActions = null }) { Text("Delete", color = ThemeExpense) } } )
     }
 }
 
@@ -355,3 +559,6 @@ fun FabMenuItem(icon: ImageVector, label: String, onClick: () -> Unit) {
         Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 }
+
+@Composable
+fun FriendHistoryView(friendName: String, viewModel: ExpenseViewModel, accountMap: Map<String, AccountEntity>, onBack: () -> Unit, onEditTransaction: (TransactionEntity) -> Unit) = FriendDetailView(friendName, viewModel, accountMap, onBack, onEditTransaction)

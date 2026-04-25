@@ -218,8 +218,12 @@ fun AddTransactionScreen(
     
     var type by remember(editingTransaction) { mutableStateOf(editingTransaction?.type ?: "EXPENSE") }
     var amount by remember(editingTransaction) { mutableStateOf(editingTransaction?.amount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
+    
+    // categoryId stores the "Category" (formerly Expense Subcategory)
     var categoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.categoryId) }
+    // subCategoryId stores the "Sub Category" (formerly Secondary Subcategory)
     var subCategoryId by remember(editingTransaction) { mutableStateOf(editingTransaction?.subCategoryId) }
+    
     var accountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.accountId) }
     var toAccountId by remember(editingTransaction) { mutableStateOf(editingTransaction?.toAccountId) }
     var isSplit by remember(editingTransaction) { mutableStateOf(editingTransaction?.isSplit ?: false) }
@@ -299,10 +303,10 @@ fun AddTransactionScreen(
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Primary Category", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Sub Transaction Type", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                val primaryCategories = when(mainType) {
+                val subTransactionTypes = when(mainType) {
                     "Spent" -> listOf("EXPENSE", "REPAID", "OTHER")
                     "Received" -> listOf("SALARY", "RECEIVED", "GIFT")
                     "Debts & Loans" -> listOf("LENT", "BORROWED")
@@ -310,9 +314,9 @@ fun AddTransactionScreen(
                     else -> emptyList()
                 }
                 
-                if (primaryCategories.isNotEmpty()) {
+                if (subTransactionTypes.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        primaryCategories.forEach { st ->
+                        subTransactionTypes.forEach { st ->
                             FilterChip(
                                 selected = type == st,
                                 onClick = { 
@@ -363,11 +367,11 @@ fun AddTransactionScreen(
             }
 
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text("Expense Subcategory", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                Text("Category", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                 
                 Box(modifier = Modifier.fillMaxWidth().clickable { showCategorySheet = true }) {
                     OutlinedTextField(
-                        value = categoryId ?: "Choose Subcategory",
+                        value = categoryId ?: "Choose Category",
                         onValueChange = {},
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -390,11 +394,11 @@ fun AddTransactionScreen(
 
             if (categoryId != null) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Text("Secondary Subcategory", color = if (categoryId == "Miscellaneous") FintechAccent else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                    Text("Sub Category", color = if (categoryId == "Miscellaneous") FintechAccent else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
                     
                     Box(modifier = Modifier.fillMaxWidth().clickable { showSubCategorySheet = true }) {
                         OutlinedTextField(
-                            value = subCategoryId ?: "Choose Detail (e.g. Walmart)",
+                            value = subCategoryId ?: "Choose Sub Category",
                             onValueChange = {},
                             readOnly = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -450,7 +454,7 @@ fun AddTransactionScreen(
                 if (totalAmt <= 0) { scope.launch { snackbarHostState.showSnackbar("Invalid amount") }; return@Button }
                 
                 if (mainType == "Spent" && type == "EXPENSE" && categoryId == "Miscellaneous" && subCategoryId.isNullOrBlank()) {
-                    scope.launch { snackbarHostState.showSnackbar("Secondary Subcategory is mandatory for Miscellaneous") }
+                    scope.launch { snackbarHostState.showSnackbar("Sub Category is mandatory for Miscellaneous") }
                     return@Button
                 }
 
@@ -487,7 +491,7 @@ fun AddTransactionScreen(
 
     if (showCategorySheet) {
         CategoryGridSelector(
-            title = "Select Expense Subcategory",
+            title = "Select Category",
             categories = expenseSubCategories,
             onCategorySelected = { 
                 if (categoryId != it.id) subCategoryId = null // Clear secondary if primary changes

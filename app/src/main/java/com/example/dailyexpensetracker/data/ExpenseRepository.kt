@@ -159,6 +159,8 @@ class ExpenseRepository(
                 "EXPENSE" -> if (transaction.isSplit) "BORROWED" else "EXPENSE"
                 else -> transaction.type
             },
+            categoryId = transaction.categoryId, // Sync Category (e.g., Groceries)
+            subCategoryId = transaction.subCategoryId, // Sync Sub Category (e.g., Walmart)
             friendName = currentUser.displayName ?: currentUser.username ?: "Someone",
             friendUid = currentUid,
             note = transaction.note,
@@ -286,7 +288,6 @@ class ExpenseRepository(
             categoryDao.insertSubCategory(sub)
         } catch (e: Exception) {
             Log.e("ExpenseRepository", "Error adding subcategory: ${e.message}")
-            // Even if cloud write fails, we might still want to add it locally or notify user
         }
     }
 
