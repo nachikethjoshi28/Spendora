@@ -234,6 +234,7 @@ fun AddTransactionScreen(
     var splitType by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitType ?: "EQUAL") }
     var splitRatio by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitRatio ?: "50") }
     var friendsShareInput by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitAmount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
+    var youPaid by remember(editingTransaction) { mutableStateOf(editingTransaction?.type != "BORROWED") }
 
     val accounts by viewModel.accounts.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
@@ -495,6 +496,22 @@ fun AddTransactionScreen(
 
                 AnimatedVisibility(visible = isSplit, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                     Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Who paid?", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = youPaid, 
+                                onClick = { youPaid = true }, 
+                                label = { Text("I paid") }, 
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent)
+                            )
+                            FilterChip(
+                                selected = !youPaid, 
+                                onClick = { youPaid = false }, 
+                                label = { Text("Friend paid") }, 
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = ThemeExpense.copy(0.2f), selectedLabelColor = ThemeExpense)
+                            )
+                        }
+
                         Text("Split with", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         FintechAutocompleteInput(friendName, friendSuggestions, { friendName = it }, "Friend Name")
 
@@ -644,12 +661,12 @@ fun AddTransactionScreen(
                 val tx = TransactionEntity(
                     id = editingTransaction?.id ?: UUID.randomUUID().toString(), 
                     amount = totalAmtVal, 
-                    type = type,
+                    type = if (isSplit && !youPaid) "BORROWED" else type,
                     categoryId = categoryId, 
                     subCategoryId = subCategoryId, 
                     accountId = accountId, 
                     toAccountId = toAccountId,
-                    isSplit = isSplit, 
+                    isSplit = if (isSplit) youPaid else false,
                     splitAmount = if (isSplit) computedSplitAmt else 0.0, 
                     splitType = if (isSplit) splitType else null, 
                     splitRatio = if (isSplit) splitRatio else null,
@@ -674,6 +691,7 @@ fun AddTransactionScreen(
     // Original Sheets and Dialogs logic
     if (showCategorySheet) {
         CategoryGridSelector(
+            viewModel = viewModel,
             title = "Select Category",
             categories = expenseSubCategories,
             onCategorySelected = { 

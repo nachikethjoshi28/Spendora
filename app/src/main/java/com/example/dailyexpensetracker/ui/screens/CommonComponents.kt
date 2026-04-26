@@ -322,11 +322,14 @@ fun FintechAutocompleteInput(value: String, suggestions: List<String>, onValueCh
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryGridSelector(
-    title: String = "Select Sub-Category",
+    viewModel: ExpenseViewModel,
+    title: String = "Select Category",
     categories: List<CategoryEntity>,
     onCategorySelected: (CategoryEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -337,13 +340,22 @@ fun CategoryGridSelector(
                 .fillMaxWidth()
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                IconButton(onClick = { showAddCategoryDialog = true }) {
+                    Icon(Icons.Default.AddCircle, "Add", tint = FintechAccent)
+                }
+            }
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
@@ -382,6 +394,26 @@ fun CategoryGridSelector(
                 }
             }
         }
+    }
+
+    if (showAddCategoryDialog) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddCategoryDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            title = { Text("New Category") },
+            text = { FintechInput(name, "Name") { name = it } },
+            confirmButton = { 
+                TextButton(onClick = { 
+                    if (name.isNotBlank()) {
+                        viewModel.addCategory(name.toSentenceCase())
+                        showAddCategoryDialog = false
+                    }
+                }) { Text("Add") } 
+            },
+            dismissButton = { TextButton(onClick = { showAddCategoryDialog = false }) { Text("Cancel") } }
+        )
     }
 }
 

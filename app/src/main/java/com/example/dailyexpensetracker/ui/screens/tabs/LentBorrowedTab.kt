@@ -1,6 +1,5 @@
 package com.example.dailyexpensetracker.ui.screens.tabs
 
-import android.app.DatePickerDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
@@ -9,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -24,13 +22,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.dailyexpensetracker.data.local.AccountEntity
-import com.example.dailyexpensetracker.data.local.CategoryEntity
 import com.example.dailyexpensetracker.data.local.FriendEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.data.local.UserEntity
@@ -39,8 +35,6 @@ import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import com.example.dailyexpensetracker.utils.toSentenceCase
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 import kotlin.math.abs
 
 @Composable
@@ -54,7 +48,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
     var searchQuery by remember { mutableStateOf("") }
     var showAddFriendDialog by remember { mutableStateOf(false) }
     var showFriendsListDialog by remember { mutableStateOf(false) }
-    var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showGroupDialog by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
 
@@ -219,11 +212,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                                 showAddFriendDialog = true
                             }
                             HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
-                            FabMenuItem(Icons.Default.MonetizationOn, "SPLIT EXPENSE") { 
-                                fabExpanded = false
-                                showAddExpenseDialog = true
-                            }
-                            HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
                             FabMenuItem(Icons.Default.GroupAdd, "CREATE GROUP") { 
                                 fabExpanded = false
                                 showGroupDialog = true
@@ -256,7 +244,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
     if (showAddFriendDialog) AddFriendDialog(viewModel = viewModel, onDismiss = { showAddFriendDialog = false })
     if (showFriendsListDialog) FriendsListDialog(viewModel = viewModel, onDismiss = { showFriendsListDialog = false })
     if (showGroupDialog) GroupComingSoonDialog(onDismiss = { showGroupDialog = false })
-    if (showAddExpenseDialog) QuickSplitExpenseDialog(viewModel = viewModel, onDismiss = { showAddExpenseDialog = false })
 }
 
 @Composable
@@ -395,232 +382,6 @@ fun FriendsListDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
                 }
             }
         }
-    }
-}
-
-@Composable
-fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
-    val friends by viewModel.friends.collectAsState()
-    val accounts by viewModel.accounts.collectAsState()
-    val friendBalances by viewModel.friendBalances.collectAsState()
-    val friendOptions = remember(friends, friendBalances) { (friends.map { it.nickname } + friendBalances.map { it.friendName }).distinct() }
-    
-    var amount by remember { mutableStateOf("") }
-    var selectedFriend by remember { mutableStateOf(friendOptions.firstOrNull() ?: "") }
-    var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id) }
-    var splitType by remember { mutableStateOf("EQUAL") }
-    var splitRatio by remember { mutableStateOf("50") }
-    var friendShareAmount by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var youPaid by remember { mutableStateOf(true) }
-    var spentAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var categoryId by remember { mutableStateOf<String?>(null) }
-    var subCategoryId by remember { mutableStateOf<String?>(null) }
-
-    val context = LocalContext.current
-    val calendar = Calendar.getInstance().apply { timeInMillis = spentAt }
-
-    val totalAmount = amount.toDoubleOrNull() ?: 0.0
-    val friendShare = when (splitType) {
-        "EQUAL" -> totalAmount / 2.0
-        "PERCENTAGE" -> totalAmount * (splitRatio.toDoubleOrNull() ?: 50.0) / 100.0
-        "AMOUNT" -> friendShareAmount.toDoubleOrNull() ?: 0.0
-        else -> totalAmount / 2.0
-    }
-
-    var showCategorySheet by remember { mutableStateOf(false) }
-    var showSubCategorySheet by remember { mutableStateOf(false) }
-
-    val expenseCategories = listOf(
-        "Housing", "Utilities", "Groceries", "Govt Services", "Dining Out",
-        "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity",
-        "Fitness", "Subscriptions", "Travel", "Gifts", "Miscellaneous"
-    ).map { CategoryEntity(id = it, name = it) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(36.dp).background(Color(0xFFFFD60A).copy(0.15f), CircleShape), Alignment.Center) {
-                    Icon(Icons.Default.Receipt, null, tint = Color(0xFFFFD60A), modifier = Modifier.size(18.dp))
-                }
-                Text("Split Expense", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Date", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Surface(
-                        onClick = {
-                            val dpd = DatePickerDialog(context, { _, year, month, day ->
-                                calendar.set(year, month, day)
-                                spentAt = calendar.timeInMillis
-                            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
-                            
-                            val minCal = Calendar.getInstance().apply {
-                                set(Calendar.DAY_OF_MONTH, 1)
-                                set(Calendar.HOUR_OF_DAY, 0)
-                                set(Calendar.MINUTE, 0)
-                                set(Calendar.SECOND, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
-                            dpd.datePicker.minDate = minCal.timeInMillis
-                            dpd.show()
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Text(
-                            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FintechAccent
-                        )
-                    }
-                }
-
-                Text("Who paid?", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = youPaid, onClick = { youPaid = true }, label = { Text("I paid") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent))
-                    FilterChip(selected = !youPaid, onClick = { youPaid = false }, label = { Text("Friend paid") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = ThemeExpense.copy(0.2f), selectedLabelColor = ThemeExpense))
-                }
-                FintechInput(amount, "Total Amount ($)") { amount = it }
-                
-                Text("Split with", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                if (friendOptions.isNotEmpty()) {
-                    FintechDropdown(friendOptions.map { it to it }, selectedFriend) { selectedFriend = it }
-                }
-
-                Text("Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Box(modifier = Modifier.fillMaxWidth().clickable { showCategorySheet = true }) {
-                    OutlinedTextField(
-                        value = categoryId ?: "Select Category",
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
-                        colors = OutlinedTextFieldDefaults.colors(disabledTextColor = MaterialTheme.colorScheme.onSurface, disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledBorderColor = Color.Transparent),
-                        enabled = false
-                    )
-                }
-
-                if (categoryId != null) {
-                    Text("Sub Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Box(modifier = Modifier.fillMaxWidth().clickable { showSubCategorySheet = true }) {
-                        OutlinedTextField(
-                            value = subCategoryId ?: "Select Sub Category",
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
-                            colors = OutlinedTextFieldDefaults.colors(disabledTextColor = MaterialTheme.colorScheme.onSurface, disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledBorderColor = Color.Transparent),
-                            enabled = false
-                        )
-                    }
-                }
-
-                Text("How to split?", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("EQUAL", "PERCENTAGE", "AMOUNT").forEach { st ->
-                        FilterChip(
-                            selected = splitType == st,
-                            onClick = { splitType = st },
-                            label = { Text(st.lowercase().replaceFirstChar { it.titlecase() }) },
-                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent)
-                        )
-                    }
-                }
-
-                if (splitType == "PERCENTAGE") {
-                    FintechInput(splitRatio, "Friend's share %") { splitRatio = it }
-                }
-                if (splitType == "AMOUNT") {
-                    FintechInput(friendShareAmount, "Friend's share ($)") { friendShareAmount = it }
-                }
-
-                if (totalAmount > 0) {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(10.dp)) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text("Your share", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-                                Text("$%.2f".format(totalAmount - friendShare), color = FintechAccent, fontWeight = FontWeight.Bold)
-                            }
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                Text("${selectedFriend.ifBlank { "Friend" }}\u0027s share", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-                                Text("$%.2f".format(friendShare), color = Color(0xFFFFD60A), fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                if (accounts.isNotEmpty()) {
-                    Text("From Account", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    FintechDropdown(accounts.map { it.id to it.name }, selectedAccountId) { selectedAccountId = it }
-                }
-                FintechInput(note, "Note (Optional)") { note = it }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { 
-                    if (totalAmount > 0 && selectedFriend.isNotBlank()) {
-                        val friendEnt = viewModel.friends.value.find { f -> f.nickname.equals(selectedFriend, ignoreCase = true) }
-                        val tx = TransactionEntity(
-                            amount = totalAmount,
-                            type = if (youPaid) "EXPENSE" else "BORROWED",
-                            accountId = selectedAccountId,
-                            categoryId = categoryId,
-                            subCategoryId = subCategoryId,
-                            isSplit = youPaid,
-                            splitAmount = friendShare,
-                            splitType = splitType,
-                            splitRatio = if (splitType == "PERCENTAGE") splitRatio else null,
-                            friendName = selectedFriend.toSentenceCase(),
-                            friendUid = friendEnt?.uid,
-                            note = note.ifBlank { "Quick Split" },
-                            spentAt = spentAt,
-                            status = "ACTIVE"
-                        )
-                        viewModel.addTransaction(tx)
-                    }
-                    onDismiss() 
-                },
-                enabled = amount.isNotBlank() && selectedFriend.isNotBlank()
-            ) { Text("Add Expense") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
-
-    if (showCategorySheet) {
-        CategoryGridSelector(
-            categories = expenseCategories,
-            onCategorySelected = {
-                if (categoryId != it.id) subCategoryId = null
-                categoryId = it.id
-                showCategorySheet = false
-            },
-            onDismiss = { showCategorySheet = false }
-        )
-    }
-
-    if (showSubCategorySheet) {
-        val allSubs by viewModel.allSubCategories.collectAsState()
-        val filteredSubs = allSubs.filter { it.categoryId == categoryId }
-        SubCategoryGridSelector(
-            viewModel = viewModel,
-            categoryId = categoryId ?: "",
-            subCategories = filteredSubs,
-            onSubCategorySelected = {
-                subCategoryId = it.name
-                showSubCategorySheet = false
-            },
-            onDismiss = { showSubCategorySheet = false }
-        )
     }
 }
 
