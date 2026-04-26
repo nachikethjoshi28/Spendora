@@ -45,10 +45,14 @@ data class TransactionEntity(
     var paymentMode: String? = null,
     
     var friendName: String? = null,
-    
+
     var friendUid: String? = null,
-    
+
     var friendContact: String? = null,
+
+    @get:PropertyName("friendPaid")
+    @set:PropertyName("friendPaid")
+    var friendPaid: Boolean = false, // ✅ Whether friend paid for split expense
     
     var note: String? = null,
     

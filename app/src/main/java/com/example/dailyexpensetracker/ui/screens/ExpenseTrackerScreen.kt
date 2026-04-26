@@ -618,14 +618,17 @@ fun AddTransactionScreen(
         }
 
         // ── Original Account Selection ──
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            Text(if (mainType == "Card Payment") "Pay From (Account)" else "Account", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(modifier = Modifier.weight(1f)) {
-                    FintechDropdown(accounts.map { it.id to it.name.toSentenceCase() }, accountId, "Select Account") { accountId = it }
-                }
-                IconButton(onClick = { showAddAccountDialog = true }, modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                    Icon(Icons.Default.AccountBalanceWallet, null, tint = FintechAccent)
+        // ✅ FIX: Hide account selection when friend paid (they're paying, not me)
+        if (!(isSplit && !youPaid)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Text(if (mainType == "Card Payment") "Pay From (Account)" else "Account", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        FintechDropdown(accounts.map { it.id to it.name.toSentenceCase() }, accountId, "Select Account") { accountId = it }
+                    }
+                    IconButton(onClick = { showAddAccountDialog = true }, modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        Icon(Icons.Default.AccountBalanceWallet, null, tint = FintechAccent)
+                    }
                 }
             }
         }
@@ -645,10 +648,53 @@ fun AddTransactionScreen(
         // ── Original Save Button Logic ──
         Button(
             onClick = {
-                if (totalAmtVal <= 0) { scope.launch { snackbarHostState.showSnackbar("Invalid amount") }; return@Button }
-                
+                // ✅ VALIDATION #1: Amount must be positive
+                if (totalAmtVal <= 0) {
+                    scope.launch { snackbarHostState.showSnackbar("Amount must be greater than $0") }
+                    return@Button
+                }
+
+                // ✅ VALIDATION #2: Validate split amount doesn't exceed total
+                if (isSplit && computedSplitAmt > totalAmtVal) {
+                    scope.launch { snackbarHostState.showSnackbar("Friend's share cannot exceed total amount") }
+                    return@Button
+                }
+
+                // ✅ VALIDATION #3: Validate percentage range
+                if (isSplit && splitType == "PERCENTAGE") {
+                    val pct = splitRatio.toDoubleOrNull() ?: 50.0
+                    if (pct < 0 || pct > 100) {
+                        scope.launch { snackbarHostState.showSnackbar("Percentage must be between 0 and 100") }
+                        return@Button
+                    }
+                }
+
+                // ✅ VALIDATION #4: Category required for EXPENSE type
+                if (mainType == "Spent" && type == "EXPENSE" && categoryId.isNullOrBlank()) {
+                    scope.launch { snackbarHostState.showSnackbar("Category is required for expenses") }
+                    return@Button
+                }
+
                 if (mainType == "Spent" && type == "EXPENSE" && categoryId == "Miscellaneous" && subCategoryId.isNullOrBlank()) {
                     scope.launch { snackbarHostState.showSnackbar("Sub Category is mandatory for Miscellaneous") }
+                    return@Button
+                }
+
+                // ✅ VALIDATION #5: Account is required (except when friend paid a split)
+                if (!(isSplit && !youPaid) && accountId.isNullOrBlank()) {
+                    scope.launch { snackbarHostState.showSnackbar("Please select an account") }
+                    return@Button
+                }
+
+                // ✅ VALIDATION #6: Friend name required for LENT/BORROWED
+                if ((type == "LENT" || type == "BORROWED") && friendName.isBlank()) {
+                    scope.launch { snackbarHostState.showSnackbar("Friend name is required for debt transactions") }
+                    return@Button
+                }
+
+                // ✅ VALIDATION #7: Friend name required for split expenses
+                if (isSplit && friendName.isBlank()) {
+                    scope.launch { snackbarHostState.showSnackbar("Friend name is required for split expenses") }
                     return@Button
                 }
 
@@ -658,26 +704,80 @@ fun AddTransactionScreen(
                     f.username?.equals(friendName.trim(), ignoreCase = true) == true
                 }
 
-                val tx = TransactionEntity(
-                    id = editingTransaction?.id ?: UUID.randomUUID().toString(), 
-                    amount = totalAmtVal, 
-                    type = if (isSplit && !youPaid) "BORROWED" else type,
-                    categoryId = categoryId, 
-                    subCategoryId = subCategoryId, 
-                    accountId = accountId, 
-                    toAccountId = toAccountId,
-                    isSplit = if (isSplit) youPaid else false,
-                    splitAmount = if (isSplit) computedSplitAmt else 0.0, 
-                    splitType = if (isSplit) splitType else null, 
-                    splitRatio = if (isSplit) splitRatio else null,
-                    friendName = friendName.trim().toSentenceCase().ifBlank { null },
-                    friendUid = friendEntity?.uid, // snippet functionality
-                    note = note.ifBlank { null }?.toSentenceCase(), 
-                    spentAt = spentAt, 
-                    createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
-                    status = "ACTIVE"
-                )
-                if (isEditing) viewModel.updateTransaction(tx) else viewModel.addTransaction(tx)
+                // ✅ CORRECTED: Single EXPENSE for splits with friendPaid flag
+                if (isSplit) {
+                    // ========== SPLIT EXPENSE ==========
+                    // When user spends $100 split 50-50:
+                    //   - computedSplitAmt = friend's share = $50
+                    //   - myShare = total - friend's share = $100 - $50 = $50
+                    //   - Type: EXPENSE (not BORROWED!)
+                    //   - Amount: $50 (my share only)
+                    //   - Category: Food (included!)
+                    //   - friendPaid: true/false (determines debt direction)
+
+                    // Calculate user's share explicitly
+                    val myShare = totalAmtVal - computedSplitAmt
+
+                    // Auto-populate note based on who paid
+                    val autoNote = if (!youPaid) {
+                        "${friendName.trim()} paid ${totalAmtVal.toInt()} and split equally with you"
+                    } else {
+                        "You paid ${totalAmtVal.toInt()} and split equally with ${friendName.trim()}"
+                    }
+
+                    val finalNote = note.ifBlank { null }?.toSentenceCase()
+                        ?: autoNote.toSentenceCase()
+
+                    val splitTx = TransactionEntity(
+                        id = editingTransaction?.id ?: UUID.randomUUID().toString(),
+                        amount = myShare,                       // ✅ USER'S share, not friend's!
+                        type = "EXPENSE",                       // ✅ Always EXPENSE for splits
+                        categoryId = categoryId,                // ✅ Category included
+                        subCategoryId = subCategoryId,
+                        accountId = if (youPaid) accountId else null,  // Account only if I paid
+                        toAccountId = null,
+                        isSplit = true,
+                        splitAmount = myShare,                  // ✅ USER'S share for reference
+                        splitType = splitType,
+                        splitRatio = splitRatio,
+                        friendName = friendName.trim().toSentenceCase().ifBlank { null },
+                        friendUid = friendEntity?.uid,
+                        friendPaid = !youPaid,                  // ✅ KEY: Whether friend paid
+                        note = finalNote,                       // ✅ Auto-populated note
+                        spentAt = spentAt,
+                        createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
+                        status = "ACTIVE"
+                    )
+
+                    if (isEditing) viewModel.updateTransaction(splitTx) else viewModel.addTransaction(splitTx)
+
+                } else {
+                    // ========== NON-SPLIT: Regular transaction ==========
+
+                    val tx = TransactionEntity(
+                        id = editingTransaction?.id ?: UUID.randomUUID().toString(),
+                        amount = totalAmtVal,
+                        type = type,
+                        categoryId = categoryId,
+                        subCategoryId = subCategoryId,
+                        accountId = accountId,
+                        toAccountId = toAccountId,
+                        isSplit = false,
+                        splitAmount = 0.0,
+                        splitType = null,
+                        splitRatio = null,
+                        friendName = friendName.trim().toSentenceCase().ifBlank { null },
+                        friendUid = friendEntity?.uid,
+                        friendPaid = false,                 // Not a split
+                        note = note.ifBlank { null }?.toSentenceCase(),
+                        spentAt = spentAt,
+                        createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
+                        status = "ACTIVE"
+                    )
+
+                    if (isEditing) viewModel.updateTransaction(tx) else viewModel.addTransaction(tx)
+                }
+
                 onSave()
             },
             modifier = Modifier.fillMaxWidth().height(60.dp),

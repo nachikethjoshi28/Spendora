@@ -134,8 +134,19 @@ class ExpenseViewModel(
                         "LENT" -> it.amount
                         "BORROWED" -> -it.amount
                         "RECEIVED" -> -it.amount
-                        "REPAID" -> it.amount
-                        "EXPENSE" -> if (it.isSplit) it.splitAmount else 0.0
+                        "REPAID" -> -it.amount
+                        "EXPENSE" -> {
+                            // ✅ CORRECTED: Use friendPaid flag for split expenses
+                            if (it.isSplit) {
+                                if (it.friendPaid) {
+                                    -it.amount  // Friend paid, I owe them
+                                } else {
+                                    it.amount   // I paid, they owe me
+                                }
+                            } else {
+                                0.0             // Regular expense doesn't affect friend balance
+                            }
+                        }
                         else -> 0.0
                     }
                 }
@@ -165,21 +176,31 @@ class ExpenseViewModel(
                 it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT") 
             }.sumOf { it.amount }
 
-            // Outflows: Expenses (user part), Lent money, Repaid debt, Others
-            val expense = currentMonthTransactions.filter { 
+            // ✅ Outflows: Expenses (user part), Lent money, Repaid debt, Others
+            // Note: For split EXPENSE transactions, amount is already the user's share only
+            val expense = currentMonthTransactions.filter {
                 it.type in listOf("EXPENSE", "OTHER", "LENT", "REPAID")
-            }.sumOf { 
-                if (it.type == "EXPENSE" && it.isSplit) it.amount - it.splitAmount else it.amount 
-            }
+            }.sumOf { it.amount }
 
-            // Net Dues (what others owe me minus what I owe others)
+            // ✅ Net Dues (what others owe me minus what I owe others)
             val dues = activeTxs.sumOf {
                 when (it.type) {
                     "LENT" -> it.amount
                     "BORROWED" -> -it.amount
                     "RECEIVED" -> -it.amount
-                    "REPAID" -> it.amount
-                    "EXPENSE" -> if (it.isSplit) it.splitAmount else 0.0
+                    "REPAID" -> -it.amount
+                    "EXPENSE" -> {
+                        // ✅ CORRECTED: Use friendPaid flag for split expenses
+                        if (it.isSplit) {
+                            if (it.friendPaid) {
+                                -it.amount  // I owe them
+                            } else {
+                                it.amount   // They owe me
+                            }
+                        } else {
+                            0.0
+                        }
+                    }
                     else -> 0.0
                 }
             }

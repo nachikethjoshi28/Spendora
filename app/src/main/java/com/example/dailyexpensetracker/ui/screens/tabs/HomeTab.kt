@@ -86,7 +86,7 @@ fun HomeTab(
         filteredTransactions.filter { it.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT") }.sumOf { it.amount }
     }
     val expense = remember(filteredTransactions) {
-        filteredTransactions.filter { it.type in listOf("EXPENSE", "OTHER") }.sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
+        filteredTransactions.filter { it.type in listOf("EXPENSE", "OTHER") }.sumOf { it.amount }
     }
     val dues = remember(filteredTransactions) {
         filteredTransactions.sumOf {
@@ -94,8 +94,8 @@ fun HomeTab(
                 "LENT" -> it.amount
                 "BORROWED" -> -it.amount
                 "RECEIVED" -> -it.amount
-                "REPAID" -> it.amount
-                "EXPENSE" -> if (it.isSplit) it.splitAmount else 0.0
+                "REPAID" -> -it.amount
+                "EXPENSE" -> if (it.isSplit) { if (it.friendPaid) -it.amount else it.amount } else 0.0
                 else -> 0.0
             }
         }

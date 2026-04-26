@@ -7,13 +7,13 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [
-        TransactionEntity::class, 
-        CategoryEntity::class, 
-        SubCategoryEntity::class, 
+        TransactionEntity::class,
+        CategoryEntity::class,
+        SubCategoryEntity::class,
         AccountEntity::class,
         FriendEntity::class
     ],
-    version = 24,
+    version = 25,  // ✅ Incremented to trigger schema update (added friendPaid field)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
