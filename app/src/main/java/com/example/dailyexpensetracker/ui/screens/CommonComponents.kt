@@ -53,7 +53,17 @@ fun TransactionItem(
     var expanded by remember { mutableStateOf(false) }
     val formatter = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
     val isDeleted = transaction.status == "DELETED"
-    val isPositive = transaction.type in listOf("INCOME", "SALARY", "RECEIVED", "REPAID", "GIFT")
+    
+    // Determine the user's share for split transactions
+    val userShare = if (transaction.isSplit) {
+        transaction.amount - transaction.splitAmount
+    } else {
+        transaction.amount
+    }
+
+    // Inflows: Salary, Received, Borrowed, Gift
+    val isPositive = transaction.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME")
+    
     val isTransferType = transaction.type in listOf("SELF_TRANSFER", "BILL PAYMENT", "LOAD GIFT CARD")
     
     val isPreviousDate = remember(transaction) {
@@ -124,16 +134,24 @@ fun TransactionItem(
                         fontSize = 16.sp,
                         textDecoration = if (isDeleted) TextDecoration.LineThrough else null
                     )
+                    
+                    val subTitle = buildString {
+                        append(transaction.type.replace("_", " ").toSentenceCase())
+                        if (transaction.isSplit) {
+                            if (transaction.friendPaid) append(" (Owed to ${transaction.friendName})")
+                            else append(" (Split with ${transaction.friendName})")
+                        }
+                    }
+                    
                     Text(
-                        text = transaction.type.replace("_", " ").toSentenceCase(),
+                        text = subTitle,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    val displayAmount = if (transaction.isSplit) transaction.amount - transaction.splitAmount else transaction.amount
                     Text(
-                        text = (if (isTransferType && transaction.type == "SELF_TRANSFER") "" else if (isPositive) "+" else "-") + "$" + "%.2f".format(displayAmount),
+                        text = (if (isTransferType && (transaction.type == "SELF_TRANSFER" || transaction.type == "BILL PAYMENT")) "" else if (isPositive) "+" else "-") + "$" + "%.2f".format(userShare),
                         color = if (isDeleted) ThemeExpense else if (isTransferType) Color.Cyan else if (isPositive) ThemeIncome else ThemeExpense,
                         fontWeight = FontWeight.Black,
                         fontSize = 16.sp,
@@ -155,10 +173,10 @@ fun TransactionItem(
                     if (isPreviousDate) DetailRow("Transaction Date", formatter.format(Date(transaction.spentAt)))
                     
                     if (transaction.categoryId != null) {
-                        DetailRow("Expense Subcategory", transaction.categoryId!!)
+                        DetailRow("Expense Category", transaction.categoryId!!)
                     }
                     if (transaction.subCategoryId != null) {
-                        DetailRow("Secondary Subcategory", transaction.subCategoryId!!)
+                        DetailRow("Secondary Detail", transaction.subCategoryId!!)
                     }
                     
                     DetailRow(if (isTransferType) "From Account" else "Account", accountName)
@@ -166,7 +184,14 @@ fun TransactionItem(
                     transaction.friendName?.let { friendName ->
                         DetailRow("Friend", friendName)
                     }
-                    if (transaction.isSplit) DetailRow("Friend's Share", "$${"%.2f".format(transaction.splitAmount)}")
+                    if (transaction.isSplit) {
+                        DetailRow("Total Transaction", "$${"%.2f".format(transaction.amount)}")
+                        DetailRow("Your Share", "$${"%.2f".format(userShare)}")
+                        DetailRow("Friend's Share", "$${"%.2f".format(transaction.splitAmount)}")
+                        if (transaction.friendPaid) {
+                            DetailRow("Payment Mode", "Paid by friend")
+                        }
+                    }
                     
                     transaction.note?.let { note ->
                         if (note.isNotBlank()) {
@@ -444,7 +469,7 @@ fun SubCategoryGridSelector(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Secondary Subcategory",
+                    text = "Secondary Detail",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onSurface

@@ -28,6 +28,8 @@ sealed class ProfileUiState {
     object LoggedOut : ProfileUiState()
 }
 
+data class FriendBalance(val friendName: String, val balance: Double)
+
 class ExpenseViewModel(
     private val repository: ExpenseRepository
 ) : ViewModel() {
@@ -126,9 +128,9 @@ class ExpenseViewModel(
 
     val friendBalances: StateFlow<List<FriendBalance>> = transactions.map { list ->
         list.filter { it.status != "DELETED" && !it.friendName.isNullOrBlank() }
-            .groupBy { it.friendName!!.trim().lowercase() } // Normalize for grouping
+            .groupBy { it.friendName!!.trim().lowercase() }
             .map { (lowerName, txs) ->
-                val displayName = txs.first().friendName!!.trim() // Use original casing from first record
+                val displayName = txs.first().friendName!!.trim()
                 val balance = txs.sumOf {
                     when (it.type) {
                         "LENT" -> it.amount
@@ -136,16 +138,11 @@ class ExpenseViewModel(
                         "RECEIVED" -> -it.amount
                         "REPAID" -> -it.amount
                         "EXPENSE" -> {
-                            // ✅ CORRECTED: Use friendPaid flag for split expenses
                             if (it.isSplit) {
-                                if (it.friendPaid) {
-                                    -it.amount  // Friend paid, I owe them
-                                } else {
-                                    it.amount   // I paid, they owe me
-                                }
-                            } else {
-                                0.0             // Regular expense doesn't affect friend balance
-                            }
+                                // amount is total, splitAmount is friend's share
+                                if (it.friendPaid) -(it.amount - it.splitAmount) // I owe them my share
+                                else it.splitAmount // They owe me their share
+                            } else 0.0
                         }
                         else -> 0.0
                     }
@@ -171,16 +168,27 @@ class ExpenseViewModel(
                 cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear
             }
 
-            // Inflows: Salary, Received debt, Borrowed debt, Gifts
-            val income = currentMonthTransactions.filter { 
-                it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT") 
-            }.sumOf { it.amount }
+            // Inflows: Salary, Received, Borrowed, Gift
+            // + My share of a split expense where friend paid (effectively a virtual loan)
+            val income = currentMonthTransactions.sumOf {
+                when {
+                    it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME") -> it.amount
+                    it.type == "EXPENSE" && it.isSplit && it.friendPaid -> (it.amount - it.splitAmount)
+                    else -> 0.0
+                }
+            }
 
-            // ✅ Outflows: Expenses (user part), Lent money, Repaid debt, Others
-            // Note: For split EXPENSE transactions, amount is already the user's share only
-            val expense = currentMonthTransactions.filter {
-                it.type in listOf("EXPENSE", "OTHER", "LENT", "REPAID")
-            }.sumOf { it.amount }
+            // Outflows: Expenses (user part), Lent money, Repaid debt
+            // Note: For split EXPENSE transactions, user's share is (amount - splitAmount)
+            val expense = currentMonthTransactions.sumOf {
+                when {
+                    it.type in listOf("EXPENSE", "OTHER") -> {
+                        if (it.isSplit) (it.amount - it.splitAmount) else it.amount
+                    }
+                    it.type in listOf("LENT", "REPAID") -> it.amount
+                    else -> 0.0
+                }
+            }
 
             // ✅ Net Dues (what others owe me minus what I owe others)
             val dues = activeTxs.sumOf {
@@ -190,16 +198,10 @@ class ExpenseViewModel(
                     "RECEIVED" -> -it.amount
                     "REPAID" -> -it.amount
                     "EXPENSE" -> {
-                        // ✅ CORRECTED: Use friendPaid flag for split expenses
                         if (it.isSplit) {
-                            if (it.friendPaid) {
-                                -it.amount  // I owe them
-                            } else {
-                                it.amount   // They owe me
-                            }
-                        } else {
-                            0.0
-                        }
+                            if (it.friendPaid) -(it.amount - it.splitAmount) // I owe them my share
+                            else it.splitAmount // They owe me their share
+                        } else 0.0
                     }
                     else -> 0.0
                 }

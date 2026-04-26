@@ -233,8 +233,10 @@ fun AddTransactionScreen(
 
     var splitType by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitType ?: "EQUAL") }
     var splitRatio by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitRatio ?: "50") }
-    var friendsShareInput by remember(editingTransaction) { mutableStateOf(editingTransaction?.splitAmount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
-    var youPaid by remember(editingTransaction) { mutableStateOf(editingTransaction?.type != "BORROWED") }
+    var friendsShareInput by remember(editingTransaction) { 
+        mutableStateOf(editingTransaction?.splitAmount?.let { if (it == 0.0) "" else it.toString() } ?: "") 
+    }
+    var youPaid by remember(editingTransaction) { mutableStateOf(editingTransaction?.friendPaid?.not() ?: true) }
 
     val accounts by viewModel.accounts.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
@@ -704,79 +706,42 @@ fun AddTransactionScreen(
                     f.username?.equals(friendName.trim(), ignoreCase = true) == true
                 }
 
-                // ✅ CORRECTED: Single EXPENSE for splits with friendPaid flag
-                if (isSplit) {
-                    // ========== SPLIT EXPENSE ==========
-                    // When user spends $100 split 50-50:
-                    //   - computedSplitAmt = friend's share = $50
-                    //   - myShare = total - friend's share = $100 - $50 = $50
-                    //   - Type: EXPENSE (not BORROWED!)
-                    //   - Amount: $50 (my share only)
-                    //   - Category: Food (included!)
-                    //   - friendPaid: true/false (determines debt direction)
-
-                    // Calculate user's share explicitly
-                    val myShare = totalAmtVal - computedSplitAmt
-
-                    // Auto-populate note based on who paid
-                    val autoNote = if (!youPaid) {
-                        "${friendName.trim()} paid ${totalAmtVal.toInt()} and split equally with you"
+                // ========== SAVE TRANSACTION ==========
+                
+                // Auto-populate note based on who paid for splits
+                val autoNote = if (isSplit) {
+                    if (!youPaid) {
+                        "${friendName.trim()} paid ${totalAmtVal.toInt()} and split with you"
                     } else {
-                        "You paid ${totalAmtVal.toInt()} and split equally with ${friendName.trim()}"
+                        "You paid ${totalAmtVal.toInt()} and split with ${friendName.trim()}"
                     }
+                } else null
 
-                    val finalNote = note.ifBlank { null }?.toSentenceCase()
-                        ?: autoNote.toSentenceCase()
+                val finalNote = note.ifBlank { null }?.toSentenceCase()
+                    ?: autoNote?.toSentenceCase()
 
-                    val splitTx = TransactionEntity(
-                        id = editingTransaction?.id ?: UUID.randomUUID().toString(),
-                        amount = myShare,                       // ✅ USER'S share, not friend's!
-                        type = "EXPENSE",                       // ✅ Always EXPENSE for splits
-                        categoryId = categoryId,                // ✅ Category included
-                        subCategoryId = subCategoryId,
-                        accountId = if (youPaid) accountId else null,  // Account only if I paid
-                        toAccountId = null,
-                        isSplit = true,
-                        splitAmount = myShare,                  // ✅ USER'S share for reference
-                        splitType = splitType,
-                        splitRatio = splitRatio,
-                        friendName = friendName.trim().toSentenceCase().ifBlank { null },
-                        friendUid = friendEntity?.uid,
-                        friendPaid = !youPaid,                  // ✅ KEY: Whether friend paid
-                        note = finalNote,                       // ✅ Auto-populated note
-                        spentAt = spentAt,
-                        createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
-                        status = "ACTIVE"
-                    )
+                val tx = TransactionEntity(
+                    id = editingTransaction?.id ?: UUID.randomUUID().toString(),
+                    amount = totalAmtVal,                      // ✅ ALWAYS Total amount
+                    type = type,
+                    categoryId = categoryId,
+                    subCategoryId = subCategoryId,
+                    accountId = if (isSplit && !youPaid) null else accountId,
+                    toAccountId = toAccountId,
+                    isSplit = isSplit,
+                    splitAmount = if (isSplit) computedSplitAmt else 0.0, // ✅ FRIEND'S share
+                    splitType = if (isSplit) splitType else null,
+                    splitRatio = if (isSplit) splitRatio else null,
+                    friendName = friendName.trim().toSentenceCase().ifBlank { null },
+                    friendUid = friendEntity?.uid,
+                    friendPaid = isSplit && !youPaid,           // ✅ Whether friend paid
+                    note = finalNote,
+                    spentAt = spentAt,
+                    createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
+                    status = "ACTIVE"
+                )
 
-                    if (isEditing) viewModel.updateTransaction(splitTx) else viewModel.addTransaction(splitTx)
-
-                } else {
-                    // ========== NON-SPLIT: Regular transaction ==========
-
-                    val tx = TransactionEntity(
-                        id = editingTransaction?.id ?: UUID.randomUUID().toString(),
-                        amount = totalAmtVal,
-                        type = type,
-                        categoryId = categoryId,
-                        subCategoryId = subCategoryId,
-                        accountId = accountId,
-                        toAccountId = toAccountId,
-                        isSplit = false,
-                        splitAmount = 0.0,
-                        splitType = null,
-                        splitRatio = null,
-                        friendName = friendName.trim().toSentenceCase().ifBlank { null },
-                        friendUid = friendEntity?.uid,
-                        friendPaid = false,                 // Not a split
-                        note = note.ifBlank { null }?.toSentenceCase(),
-                        spentAt = spentAt,
-                        createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
-                        status = "ACTIVE"
-                    )
-
-                    if (isEditing) viewModel.updateTransaction(tx) else viewModel.addTransaction(tx)
-                }
+                if (isEditing) viewModel.updateTransaction(tx) else viewModel.addTransaction(tx)
 
                 onSave()
             },

@@ -82,12 +82,28 @@ fun HomeTab(
         activeTransactions.filter { it.spentAt in start..end }
     }
 
+    // Incomes: Salary, Gift, Received debt repayment
+    // Note: BORROWED (direct cash loan) is also cash inflow
     val income = remember(filteredTransactions) {
-        filteredTransactions.filter { it.type in listOf("SALARY", "RECEIVED", "REPAID", "GIFT") }.sumOf { it.amount }
+        filteredTransactions.sumOf {
+            if (it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME")) it.amount else 0.0
+        }
     }
+    
+    // Expenses: Regular expense, split share, lent money, debt repayment
     val expense = remember(filteredTransactions) {
-        filteredTransactions.filter { it.type in listOf("EXPENSE", "OTHER") }.sumOf { it.amount }
+        filteredTransactions.sumOf {
+            when {
+                it.type in listOf("EXPENSE", "OTHER") -> {
+                    if (it.isSplit) (it.amount - it.splitAmount) else it.amount
+                }
+                it.type in listOf("LENT", "REPAID") -> it.amount
+                else -> 0.0
+            }
+        }
     }
+    
+    // Net Dues (what others owe me minus what I owe others)
     val dues = remember(filteredTransactions) {
         filteredTransactions.sumOf {
             when (it.type) {
@@ -95,13 +111,21 @@ fun HomeTab(
                 "BORROWED" -> -it.amount
                 "RECEIVED" -> -it.amount
                 "REPAID" -> -it.amount
-                "EXPENSE" -> if (it.isSplit) { if (it.friendPaid) -it.amount else it.amount } else 0.0
+                "EXPENSE" -> {
+                    if (it.isSplit) {
+                        if (it.friendPaid) -(it.amount - it.splitAmount) // I owe them my share
+                        else it.splitAmount // They owe me their share
+                    } else 0.0
+                }
                 else -> 0.0
             }
         }
     }
 
-    val savings = income - expense
+    // Savings = Earned Income - Expenses
+    // For a cleaner "Savings" look, we exclude borrowed debt from "Income" here
+    val earnedIncome = filteredTransactions.filter { it.type in listOf("SALARY", "GIFT", "INCOME") }.sumOf { it.amount }
+    val savings = earnedIncome - expense
     val savingsColor = if (savings >= 0) ThemeIncome else ThemeExpense
 
     var showActions by remember { mutableStateOf<TransactionEntity?>(null) }
@@ -112,7 +136,6 @@ fun HomeTab(
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
         item {
-            // Premium hero balance card — soft accent gradient, refined typography
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -160,7 +183,6 @@ fun HomeTab(
                             )
                         }
 
-                        // Premium "Statements" pill button — filled tonal with subtle accent
                         Surface(
                             onClick = { showStatementDialog = true },
                             shape = RoundedCornerShape(14.dp),
@@ -200,22 +222,12 @@ fun HomeTab(
                     if (savings >= 0) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = ThemeIncome, modifier = Modifier.size(13.dp))
-                            Text(
-                                "Saving steadily",
-                                color = ThemeIncome,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text("Saving steadily", color = ThemeIncome, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.TrendingDown, contentDescription = null, tint = ThemeExpense, modifier = Modifier.size(13.dp))
-                            Text(
-                                "Spending exceeds income",
-                                color = ThemeExpense,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text("Spending exceeds income", color = ThemeExpense, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -285,10 +297,10 @@ fun HomeTab(
                                     tempStartDate = cal.timeInMillis
                                 }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
                             },
-                            label = { Text(if (tempStartDate == 0L) "From" else SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tempStartDate)), fontSize = 10.sp) },
-                            colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface)
+                            label = { Text(if (tempStartDate == 0L) "From" else SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(tempStartDate))) },
+                            leadingIcon = { Icon(Icons.Default.CalendarToday, null, Modifier.size(14.dp)) }
                         )
-                        Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                        Text("to", color = Color.Gray, fontSize = 12.sp)
                         AssistChip(
                             onClick = {
                                 val cal = Calendar.getInstance().apply { timeInMillis = tempEndDate }
@@ -297,15 +309,12 @@ fun HomeTab(
                                     tempEndDate = cal.timeInMillis
                                 }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
                             },
-                            label = { Text(SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tempEndDate)), fontSize = 10.sp) },
-                            colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurface)
+                            label = { Text(SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(tempEndDate))) },
+                            leadingIcon = { Icon(Icons.Default.CalendarToday, null, Modifier.size(14.dp)) }
                         )
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { 
-                            appliedStartDate = tempStartDate
-                            appliedEndDate = tempEndDate
-                        }) {
-                            Icon(Icons.Default.Check, "Apply", tint = FintechAccent)
+                        IconButton(onClick = { appliedStartDate = tempStartDate; appliedEndDate = tempEndDate }, colors = IconButtonDefaults.iconButtonColors(containerColor = FintechAccent, contentColor = Color.White)) {
+                            Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                         }
                     }
                 }
@@ -315,30 +324,35 @@ fun HomeTab(
         if (filteredTransactions.isEmpty()) {
             item {
                 Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) {
-                    Text("No transactions found for this period", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No transactions found", color = Color.Gray)
+                }
+            }
+        } else {
+            items(filteredTransactions.take(visibleLimit)) { tx ->
+                TransactionItem(
+                    transaction = tx,
+                    categoryName = categoryMap[tx.categoryId]?.name ?: tx.type,
+                    accountName = accountMap[tx.accountId]?.name ?: (if (tx.isSplit && tx.friendPaid) "Friend Paid" else "Unknown"),
+                    onLongClick = { showActions = tx }
+                )
+            }
+            if (filteredTransactions.size > visibleLimit) {
+                item {
+                    TextButton(onClick = { visibleLimit += 15 }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Show More", color = FintechAccent, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
+    }
 
-        items(filteredTransactions.take(visibleLimit)) { tx ->
-            TransactionItem(
-                transaction = tx,
-                categoryName = (categoryMap[tx.categoryId]?.name ?: tx.type).toSentenceCase(),
-                accountName = accountMap[tx.accountId]?.name ?: "Unknown",
-                onLongClick = { if (tx.status != "DELETED") showActions = tx }
-            )
-        }
-
-        if (filteredTransactions.size > visibleLimit) {
-            item {
-                TextButton(
-                    onClick = { visibleLimit += 15 },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Load More", color = FintechAccent, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
+    if (showStatementDialog) {
+        StatementDialog(
+            transactions = filteredTransactions,
+            categoryMap = categoryMap.mapValues { it.value.name },
+            accountMap = accountMap.mapValues { it.value.name },
+            onDismiss = { showStatementDialog = false }
+        )
     }
 
     if (showActions != null) {
@@ -347,162 +361,66 @@ fun HomeTab(
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Transaction Options") },
-            text = { Text("What to do with this record?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = { 
-                Button(onClick = { 
-                    onEditTransaction(showActions!!)
-                    showActions = null 
-                }) { Text("Edit") } 
+            text = { Text("What would you like to do with this transaction?", color = Color.Gray) },
+            confirmButton = {
+                Button(onClick = { onEditTransaction(showActions!!); showActions = null }, colors = ButtonDefaults.buttonColors(containerColor = FintechAccent)) {
+                    Text("Edit")
+                }
             },
-            dismissButton = { 
-                TextButton(onClick = { 
-                    viewModel.deleteTransaction(showActions!!.id)
-                    showActions = null 
-                }) { Text("Delete", color = ThemeExpense) } 
+            dismissButton = {
+                TextButton(onClick = { viewModel.deleteTransaction(showActions!!.id); showActions = null }) {
+                    Text("Delete", color = ThemeExpense)
+                }
             }
         )
     }
+}
 
-    if (showStatementDialog) {
-        // Statements are released on the 1st of the following month.
-        // i.e. April's statement is generated on May 1st — so we only list months that have already ENDED.
-        val availableMonths = remember(activeTransactions) {
-            val months = mutableListOf<Calendar>()
-            if (activeTransactions.isEmpty()) return@remember emptyList()
-
-            val firstTxDate = activeTransactions.minOf { it.spentAt }
-            val firstMonth = Calendar.getInstance().apply {
-                timeInMillis = firstTxDate
-                set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }
-            // Start from the PREVIOUS calendar month — current month's statement is not yet "generated".
-            val cursor = Calendar.getInstance().apply {
-                set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-                add(Calendar.MONTH, -1)
-            }
-            while (!cursor.before(firstMonth)) {
-                months.add(cursor.clone() as Calendar)
-                cursor.add(Calendar.MONTH, -1)
-            }
-            months
-        }
-
-        // For the placeholder telling the user when their first statement will appear
-        val nextStatementLabel = remember {
-            val cal = Calendar.getInstance().apply {
-                set(Calendar.DAY_OF_MONTH, 1); add(Calendar.MONTH, 1)
-            }
-            SimpleDateFormat("MMMM 1, yyyy", Locale.getDefault()).format(cal.time)
-        }
-
-        AlertDialog(
-            onDismissRequest = { showStatementDialog = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(24.dp),
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(FintechAccent.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Description, null, tint = FintechAccent, modifier = Modifier.size(18.dp))
-                    }
-                    Column {
-                        Text("Monthly Statements", fontWeight = FontWeight.Black, fontSize = 18.sp)
-                        Text("Released on the 1st of every month", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                    }
-                }
-            },
-            text = {
-                if (availableMonths.isEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(FintechAccent.copy(alpha = 0.08f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.HourglassEmpty, null, tint = FintechAccent, modifier = Modifier.size(28.dp))
-                        }
-                        Text("No statements yet", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
-                        Text(
-                            "Your first statement will be available on $nextStatementLabel.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.heightIn(max = 360.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(availableMonths) { monthCal ->
-                            val monthLabel = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(monthCal.time)
-                            val start = monthCal.timeInMillis
-                            val end = (monthCal.clone() as Calendar).apply { add(Calendar.MONTH, 1); add(Calendar.MILLISECOND, -1) }.timeInMillis
-                            val monthTx = activeTransactions.filter { it.spentAt in start..end }
-                            val monthSpent = monthTx
-                                .filter { it.type in listOf("EXPENSE", "OTHER") }
-                                .sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount }
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    scope.launch {
-                                        generateCombinedPdf(
-                                            context,
-                                            "Spendora_Statement_$monthLabel",
-                                            monthTx,
-                                            categoryMap.mapValues { it.value.name },
-                                            accountMap.mapValues { it.value.name }
-                                        ) { uri: android.net.Uri ->
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, "application/pdf")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            try {
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Log.e("HomeTab", "PDF View Error", e)
-                                                Toast.makeText(context, "No PDF viewer found. Please install one.", Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
-                                },
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, FintechAccent.copy(alpha = 0.18f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(FintechAccent.copy(alpha = 0.12f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.PictureAsPdf, null, tint = FintechAccent, modifier = Modifier.size(20.dp))
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(monthLabel, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text(
-                                            "${monthTx.size} transactions  ·  $${"%.0f".format(monthSpent)} spent",
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                    Icon(Icons.Default.ChevronRight, null, tint = FintechAccent, modifier = Modifier.size(20.dp))
-                                }
+@Composable
+fun StatementDialog(
+    transactions: List<TransactionEntity>, 
+    categoryMap: Map<String, String>, 
+    accountMap: Map<String, String>, 
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        title = { Text("Download Statement", fontWeight = FontWeight.Bold) },
+        text = { Text("Choose a format to download your transaction history for the selected period.", color = Color.Gray) },
+        confirmButton = {
+            Button(onClick = { 
+                val fileName = "Spendora_Statement_${SimpleDateFormat("MMMM_yyyy", Locale.getDefault()).format(Date())}"
+                scope.launch {
+                    generateCombinedPdf(
+                        context = context,
+                        fileName = fileName,
+                        transactions = transactions,
+                        categoryMap = categoryMap,
+                        accountMap = accountMap,
+                        onComplete = { uri ->
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/pdf"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
+                            context.startActivity(Intent.createChooser(intent, "Share Statement"))
                         }
-                    }
+                    )
                 }
-            },
-            confirmButton = { TextButton(onClick = { showStatementDialog = false }) { Text("Close", color = FintechAccent) } }
-        )
-    }
+                onDismiss()
+            }, colors = ButtonDefaults.buttonColors(containerColor = FintechAccent)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.PictureAsPdf, null, Modifier.size(18.dp))
+                    Text("PDF Report")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

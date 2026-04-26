@@ -148,19 +148,30 @@ class ExpenseRepository(
     private suspend fun syncTransactionToFriend(currentUid: String, transaction: TransactionEntity) {
         val friendUid = transaction.friendUid ?: return
         val currentUser = getUserProfileFlow(currentUid).firstOrNull() ?: return
+        
+        // Determine sync type
+        val friendTxType = when (transaction.type) {
+            "LENT" -> "BORROWED"
+            "BORROWED" -> "LENT"
+            "REPAID" -> "RECEIVED"
+            "RECEIVED" -> "REPAID"
+            "EXPENSE" -> {
+                if (transaction.isSplit) {
+                    if (transaction.friendPaid) "LENT" else "BORROWED"
+                } else "EXPENSE"
+            }
+            else -> transaction.type
+        }
+
         val friendTx = TransactionEntity(
             id = transaction.id,
-            amount = if (transaction.isSplit) transaction.splitAmount else transaction.amount,
-            type = when (transaction.type) {
-                "LENT" -> "BORROWED"
-                "BORROWED" -> "LENT"
-                "REPAID" -> "RECEIVED"
-                "RECEIVED" -> "REPAID"
-                "EXPENSE" -> if (transaction.isSplit) "BORROWED" else "EXPENSE"
-                else -> transaction.type
-            },
-            categoryId = transaction.categoryId, // Sync Category (e.g., Groceries)
-            subCategoryId = transaction.subCategoryId, // Sync Sub Category (e.g., Walmart)
+            amount = if (transaction.isSplit) {
+                if (transaction.friendPaid) (transaction.amount - transaction.splitAmount) // I owe them my share
+                else transaction.splitAmount // They owe me their share
+            } else transaction.amount,
+            type = friendTxType,
+            categoryId = transaction.categoryId, 
+            subCategoryId = transaction.subCategoryId,
             friendName = currentUser.displayName ?: currentUser.username ?: "Someone",
             friendUid = currentUid,
             note = transaction.note,
@@ -222,7 +233,14 @@ class ExpenseRepository(
                     "EXPENSE", "LENT", "REPAID", "OTHER" -> -1.0
                     else -> 0.0
                 }
-                adjustFirestoreBalance(uid, accId, transaction.amount * typeFactor * signFactor)
+                
+                val impactAmount = if (transaction.type == "EXPENSE" && transaction.isSplit) {
+                    if (transaction.friendPaid) 0.0 else transaction.amount
+                } else {
+                    transaction.amount
+                }
+                
+                adjustFirestoreBalance(uid, accId, impactAmount * typeFactor * signFactor)
             }
         } catch (e: Exception) {
             Log.e("ExpenseRepository", "Error updating balance", e)
