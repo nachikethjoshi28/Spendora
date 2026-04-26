@@ -294,10 +294,20 @@ fun AddTransactionScreen(
                 Text("Transaction Details", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                 Surface(
                     onClick = {
-                        DatePickerDialog(context, { _, year, month, day ->
+                        val dpd = DatePickerDialog(context, { _, year, month, day ->
                             calendar.set(year, month, day)
                             spentAt = calendar.timeInMillis
-                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
+                        
+                        val minCal = Calendar.getInstance().apply {
+                            set(Calendar.DAY_OF_MONTH, 1)
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        dpd.datePicker.minDate = minCal.timeInMillis
+                        dpd.show()
                     },
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant

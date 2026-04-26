@@ -1,5 +1,6 @@
 package com.example.dailyexpensetracker.ui.screens.tabs
 
+import android.app.DatePickerDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.dailyexpensetracker.data.local.AccountEntity
+import com.example.dailyexpensetracker.data.local.CategoryEntity
 import com.example.dailyexpensetracker.data.local.FriendEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.data.local.UserEntity
@@ -37,6 +39,8 @@ import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import com.example.dailyexpensetracker.utils.toSentenceCase
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.math.abs
 
 @Composable
@@ -409,6 +413,12 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
     var friendShareAmount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var youPaid by remember { mutableStateOf(true) }
+    var spentAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var categoryId by remember { mutableStateOf<String?>(null) }
+    var subCategoryId by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance().apply { timeInMillis = spentAt }
 
     val totalAmount = amount.toDoubleOrNull() ?: 0.0
     val friendShare = when (splitType) {
@@ -417,6 +427,15 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
         "AMOUNT" -> friendShareAmount.toDoubleOrNull() ?: 0.0
         else -> totalAmount / 2.0
     }
+
+    var showCategorySheet by remember { mutableStateOf(false) }
+    var showSubCategorySheet by remember { mutableStateOf(false) }
+
+    val expenseCategories = listOf(
+        "Housing", "Utilities", "Groceries", "Govt Services", "Dining Out",
+        "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity",
+        "Fitness", "Subscriptions", "Travel", "Gifts", "Miscellaneous"
+    ).map { CategoryEntity(id = it, name = it) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -432,6 +451,37 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Date", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Surface(
+                        onClick = {
+                            val dpd = DatePickerDialog(context, { _, year, month, day ->
+                                calendar.set(year, month, day)
+                                spentAt = calendar.timeInMillis
+                            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
+                            
+                            val minCal = Calendar.getInstance().apply {
+                                set(Calendar.DAY_OF_MONTH, 1)
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            dpd.datePicker.minDate = minCal.timeInMillis
+                            dpd.show()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(spentAt)),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FintechAccent
+                        )
+                    }
+                }
+
                 Text("Who paid?", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = youPaid, onClick = { youPaid = true }, label = { Text("I paid") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = FintechAccent.copy(0.2f), selectedLabelColor = FintechAccent))
@@ -442,6 +492,36 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
                 Text("Split with", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 if (friendOptions.isNotEmpty()) {
                     FintechDropdown(friendOptions.map { it to it }, selectedFriend) { selectedFriend = it }
+                }
+
+                Text("Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Box(modifier = Modifier.fillMaxWidth().clickable { showCategorySheet = true }) {
+                    OutlinedTextField(
+                        value = categoryId ?: "Select Category",
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        colors = OutlinedTextFieldDefaults.colors(disabledTextColor = MaterialTheme.colorScheme.onSurface, disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledBorderColor = Color.Transparent),
+                        enabled = false
+                    )
+                }
+
+                if (categoryId != null) {
+                    Text("Sub Category", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Box(modifier = Modifier.fillMaxWidth().clickable { showSubCategorySheet = true }) {
+                        OutlinedTextField(
+                            value = subCategoryId ?: "Select Sub Category",
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                            colors = OutlinedTextFieldDefaults.colors(disabledTextColor = MaterialTheme.colorScheme.onSurface, disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant, disabledBorderColor = Color.Transparent),
+                            enabled = false
+                        )
+                    }
                 }
 
                 Text("How to split?", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -494,6 +574,8 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
                             amount = totalAmount,
                             type = if (youPaid) "EXPENSE" else "BORROWED",
                             accountId = selectedAccountId,
+                            categoryId = categoryId,
+                            subCategoryId = subCategoryId,
                             isSplit = youPaid,
                             splitAmount = friendShare,
                             splitType = splitType,
@@ -501,6 +583,7 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
                             friendName = selectedFriend.toSentenceCase(),
                             friendUid = friendEnt?.uid,
                             note = note.ifBlank { "Quick Split" },
+                            spentAt = spentAt,
                             status = "ACTIVE"
                         )
                         viewModel.addTransaction(tx)
@@ -512,6 +595,33 @@ fun QuickSplitExpenseDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) 
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+
+    if (showCategorySheet) {
+        CategoryGridSelector(
+            categories = expenseCategories,
+            onCategorySelected = {
+                if (categoryId != it.id) subCategoryId = null
+                categoryId = it.id
+                showCategorySheet = false
+            },
+            onDismiss = { showCategorySheet = false }
+        )
+    }
+
+    if (showSubCategorySheet) {
+        val allSubs by viewModel.allSubCategories.collectAsState()
+        val filteredSubs = allSubs.filter { it.categoryId == categoryId }
+        SubCategoryGridSelector(
+            viewModel = viewModel,
+            categoryId = categoryId ?: "",
+            subCategories = filteredSubs,
+            onSubCategorySelected = {
+                subCategoryId = it.name
+                showSubCategorySheet = false
+            },
+            onDismiss = { showSubCategorySheet = false }
+        )
+    }
 }
 
 @Composable
