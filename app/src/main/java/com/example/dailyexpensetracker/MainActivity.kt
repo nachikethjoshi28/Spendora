@@ -8,7 +8,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.dailyexpensetracker.data.ExpenseRepository
 import com.example.dailyexpensetracker.data.local.AppDatabase
-import com.example.dailyexpensetracker.ui.screens.ExpenseTrackerScreen
+import com.example.dailyexpensetracker.ui.tabs.ExpenseTrackerScreen
 import com.example.dailyexpensetracker.ui.theme.SpendoraTheme
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModelFactory

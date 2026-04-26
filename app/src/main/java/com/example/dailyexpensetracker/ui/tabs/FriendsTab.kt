@@ -1,4 +1,4 @@
-package com.example.dailyexpensetracker.ui.screens.tabs
+package com.example.dailyexpensetracker.ui.tabs
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -27,10 +27,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.dailyexpensetracker.data.local.AccountEntity
-import com.example.dailyexpensetracker.data.local.FriendEntity
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.data.local.UserEntity
-import com.example.dailyexpensetracker.ui.screens.*
+import com.example.dailyexpensetracker.ui.components.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import com.example.dailyexpensetracker.utils.toSentenceCase
@@ -38,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 @Composable
-fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntity) -> Unit) {
+fun FriendsTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntity) -> Unit) {
     val friendBalances by viewModel.friendBalances.collectAsState()
     val friends by viewModel.friends.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
@@ -64,7 +63,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (selectedFriend == null) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)) {
                     Text(
                         "Friends",
@@ -75,7 +73,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                     
                     Spacer(Modifier.height(16.dp))
 
-                    // Search Bar + My Friends Icon
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -144,7 +141,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                     }
                 }
 
-                // Friends List
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -173,8 +169,8 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(shape = CircleShape, modifier = Modifier.size(48.dp), color = color.copy(0.12f)) {
-                                    if (!friendEntity?.profilePictureUri.isNullOrEmpty()) {
-                                        AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(friendEntity!!.profilePictureUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                                    if (friendEntity?.profilePictureUri != null && friendEntity.profilePictureUri!!.isNotEmpty()) {
+                                        AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(friendEntity.profilePictureUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                                     } else {
                                         Box(Modifier.fillMaxSize(), Alignment.Center) {
                                             Text(item.friendName.firstOrNull()?.uppercaseChar()?.toString() ?: "?", color = color, fontWeight = FontWeight.Black, fontSize = 20.sp)
@@ -194,7 +190,6 @@ fun LentBorrowedTab(viewModel: ExpenseViewModel, onEditTransaction: (Transaction
                 }
             }
 
-            // FAB Menu on bottom right
             Column(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
                 horizontalAlignment = Alignment.End
@@ -366,7 +361,7 @@ fun FriendsListDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
                     items(friends) { friend ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Surface(shape = CircleShape, modifier = Modifier.size(44.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                                if (!friend.profilePictureUri.isNullOrEmpty()) {
+                                if (friend.profilePictureUri != null && friend.profilePictureUri!!.isNotEmpty()) {
                                     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(friend.profilePictureUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
                                 } else {
                                     Box(Modifier.fillMaxSize(), Alignment.Center) { Text(friend.nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?", color = FintechAccent, fontWeight = FontWeight.Bold) }

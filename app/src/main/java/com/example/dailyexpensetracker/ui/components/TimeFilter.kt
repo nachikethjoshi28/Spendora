@@ -1,4 +1,4 @@
-package com.example.dailyexpensetracker.ui.screens
+package com.example.dailyexpensetracker.ui.components
 
 enum class TimeFilter(val label: String) {
     LAST_MONTH("Last 30 Days"),

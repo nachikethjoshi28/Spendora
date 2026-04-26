@@ -1,4 +1,4 @@
-package com.example.dailyexpensetracker.ui.screens
+package com.example.dailyexpensetracker.ui.tabs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

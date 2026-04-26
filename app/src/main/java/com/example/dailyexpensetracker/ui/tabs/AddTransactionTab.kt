@@ -1,10 +1,7 @@
-package com.example.dailyexpensetracker.ui.screens
+package com.example.dailyexpensetracker.ui.tabs
 
 import android.app.DatePickerDialog
-import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -18,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -28,174 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dailyexpensetracker.data.local.TransactionEntity
 import com.example.dailyexpensetracker.data.local.CategoryEntity
-import com.example.dailyexpensetracker.data.local.SubCategoryEntity
-import com.example.dailyexpensetracker.ui.screens.tabs.*
+import com.example.dailyexpensetracker.ui.components.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
-import com.example.dailyexpensetracker.ui.viewmodel.ProfileUiState
 import com.example.dailyexpensetracker.utils.toSentenceCase
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-
-@Composable
-fun ExpenseTrackerScreen(viewModel: ExpenseViewModel) {
-    val profileState by viewModel.profileState.collectAsState()
-    val context = LocalContext.current
-
-    when (profileState) {
-        is ProfileUiState.LoggedOut -> {
-            LoginScreen(
-                onLoginSuccess = {
-                    Firebase.auth.currentUser?.let { user ->
-                        viewModel.signIn(user.uid, user.email ?: "", user.displayName)
-                    }
-                },
-                onEmailLogin = { email, pass ->
-                    Firebase.auth.signInWithEmailAndPassword(email, pass)
-                        .addOnSuccessListener { result ->
-                            result.user?.let { viewModel.signIn(it.uid, it.email ?: "", it.displayName) }
-                        }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(context, "Login Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                },
-                onEmailSignUp = { email, pass ->
-                    Firebase.auth.createUserWithEmailAndPassword(email, pass)
-                        .addOnSuccessListener { result ->
-                            result.user?.let { viewModel.signIn(it.uid, it.email ?: "", it.displayName) }
-                        }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(context, "Sign Up Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                },
-                onPhoneLogin = { /* Phone auth logic */ },
-                onVerifyOtp = { /* OTP verify logic */ }
-            )
-        }
-        is ProfileUiState.NotRegistered -> {
-            RegistrationScreen(viewModel) { username, dob ->
-                viewModel.completeRegistration(username, dob)
-            }
-        }
-        is ProfileUiState.Success -> {
-            MainScaffold(viewModel)
-        }
-        is ProfileUiState.Loading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = FintechAccent)
-            }
-        }
-    }
-}
-
-@Composable
-fun MainScaffold(viewModel: ExpenseViewModel) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var editingTransaction by remember { mutableStateOf<TransactionEntity?>(null) }
-    
-    val tabs = listOf("Home", "Insights", "Add", "Friends", "Profile")
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    BackHandler(enabled = selectedTab != 0) {
-        selectedTab = 0
-    }
-
-    LaunchedEffect(editingTransaction) {
-        if (editingTransaction != null) {
-            selectedTab = 2
-        }
-    }
-
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    tonalElevation = 8.dp,
-                    modifier = Modifier.clip(RoundedCornerShape(24.dp))
-                ) {
-                    tabs.forEachIndexed { index, title ->
-                        NavigationBarItem(
-                            selected = selectedTab == index,
-                            onClick = { 
-                                selectedTab = index 
-                                if (index != 2) editingTransaction = null
-                            },
-                            label = { 
-                                Text(
-                                    title, 
-                                    fontSize = 10.sp, 
-                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal 
-                                ) 
-                            },
-                            icon = {
-                                if (index == 2) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (selectedTab == 2) FintechAccent else Color.Transparent,
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                Icons.Default.Add,
-                                                contentDescription = title,
-                                                tint = if (selectedTab == 2) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Icon(
-                                        imageVector = when (index) {
-                                            0 -> Icons.Default.Home
-                                            1 -> Icons.Default.BarChart
-                                            3 -> Icons.Default.People
-                                            else -> Icons.Default.Person
-                                        },
-                                        contentDescription = title
-                                    )
-                                }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = FintechAccent,
-                                selectedTextColor = FintechAccent,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                indicatorColor = Color.Transparent
-                            )
-                        )
-                    }
-                }
-            }
-        ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                when (selectedTab) {
-                    0 -> HomeTab(
-                        viewModel = viewModel, 
-                        onEditTransaction = { editingTransaction = it }
-                    )
-                    1 -> InsightsTab(viewModel)
-                    2 -> AddTransactionScreen(
-                        viewModel = viewModel,
-                        editingTransaction = editingTransaction,
-                        onSave = { 
-                            editingTransaction = null
-                            selectedTab = 0 
-                        },
-                        snackbarHostState = snackbarHostState
-                    )
-                    3 -> LentBorrowedTab(viewModel, onEditTransaction = { editingTransaction = it })
-                    4 -> ProfileTab(viewModel, onEditTransaction = { editingTransaction = it })
-                }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -207,7 +42,6 @@ fun AddTransactionScreen(
 ) {
     val isEditing = editingTransaction != null
 
-    // -- State hybridization --
     var mainType by remember(editingTransaction) { 
         mutableStateOf(when(editingTransaction?.type) {
             "EXPENSE", "REPAID", "OTHER" -> "Spent"
@@ -242,7 +76,6 @@ fun AddTransactionScreen(
     val friendBalances by viewModel.friendBalances.collectAsState()
     val friends by viewModel.friends.collectAsState()
 
-    // Friend suggestions from snippet
     val friendSuggestions = remember(friends, friendBalances) {
         val fromFriends = friends.map { it.nickname }
         val fromHistory = friendBalances.map { it.friendName }
@@ -257,7 +90,6 @@ fun AddTransactionScreen(
     var showCategorySheet by remember { mutableStateOf(false) }
     var showSubCategorySheet by remember { mutableStateOf(false) }
 
-    // Original local categories list
     val expenseSubCategories = listOf(
         "Housing", "Utilities", "Groceries", "Govt Services", "Dining Out",
         "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity",
@@ -268,7 +100,6 @@ fun AddTransactionScreen(
         viewModel.selectCategory(categoryId)
     }
 
-    // Computed split amount from snippet
     val totalAmtVal = amount.toDoubleOrNull() ?: 0.0
     val computedSplitAmt = when (splitType) {
         "EQUAL" -> totalAmtVal / 2.0
@@ -281,13 +112,11 @@ fun AddTransactionScreen(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Original Header UI
         Spacer(Modifier.height(24.dp))
         Text(text = if (isEditing) "Edit Transaction" else "Add Transaction", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         
         Spacer(Modifier.height(32.dp))
 
-        // ── Transaction Type Card (From Snippet UI) ──
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -427,7 +256,6 @@ fun AddTransactionScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Total Amount UI (From Snippet UI) ──
         SectionCard {
             Text("Amount", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
             Spacer(Modifier.height(10.dp))
@@ -477,7 +305,6 @@ fun AddTransactionScreen(
             }
         }
 
-        // ── Split with Friend UI & Logic (From Snippet) ──
         if (mainType == "Spent" && type == "EXPENSE") {
             Spacer(Modifier.height(16.dp))
             SectionCard {
@@ -557,7 +384,6 @@ fun AddTransactionScreen(
             }
         }
 
-        // ── Original Category Selection ──
         if (mainType == "Spent" && type == "EXPENSE") {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("Category", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
@@ -619,8 +445,6 @@ fun AddTransactionScreen(
             FintechAutocompleteInput(friendName, friendSuggestions, { friendName = it }, "Friend Name")
         }
 
-        // ── Original Account Selection ──
-        // ✅ FIX: Hide account selection when friend paid (they're paying, not me)
         if (!(isSplit && !youPaid)) {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text(if (mainType == "Card Payment") "Pay From (Account)" else "Account", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
@@ -642,27 +466,22 @@ fun AddTransactionScreen(
             }
         }
 
-        // ── Original Note ──
         FintechInput(note, "Note (Optional)") { note = it }
 
         Spacer(Modifier.height(32.dp))
 
-        // ── Original Save Button Logic ──
         Button(
             onClick = {
-                // ✅ VALIDATION #1: Amount must be positive
                 if (totalAmtVal <= 0) {
                     scope.launch { snackbarHostState.showSnackbar("Amount must be greater than $0") }
                     return@Button
                 }
 
-                // ✅ VALIDATION #2: Validate split amount doesn't exceed total
                 if (isSplit && computedSplitAmt > totalAmtVal) {
                     scope.launch { snackbarHostState.showSnackbar("Friend's share cannot exceed total amount") }
                     return@Button
                 }
 
-                // ✅ VALIDATION #3: Validate percentage range
                 if (isSplit && splitType == "PERCENTAGE") {
                     val pct = splitRatio.toDoubleOrNull() ?: 50.0
                     if (pct < 0 || pct > 100) {
@@ -671,7 +490,6 @@ fun AddTransactionScreen(
                     }
                 }
 
-                // ✅ VALIDATION #4: Category required for EXPENSE type
                 if (mainType == "Spent" && type == "EXPENSE" && categoryId.isNullOrBlank()) {
                     scope.launch { snackbarHostState.showSnackbar("Category is required for expenses") }
                     return@Button
@@ -682,33 +500,26 @@ fun AddTransactionScreen(
                     return@Button
                 }
 
-                // ✅ VALIDATION #5: Account is required (except when friend paid a split)
                 if (!(isSplit && !youPaid) && accountId.isNullOrBlank()) {
                     scope.launch { snackbarHostState.showSnackbar("Please select an account") }
                     return@Button
                 }
 
-                // ✅ VALIDATION #6: Friend name required for LENT/BORROWED
                 if ((type == "LENT" || type == "BORROWED") && friendName.isBlank()) {
                     scope.launch { snackbarHostState.showSnackbar("Friend name is required for debt transactions") }
                     return@Button
                 }
 
-                // ✅ VALIDATION #7: Friend name required for split expenses
                 if (isSplit && friendName.isBlank()) {
                     scope.launch { snackbarHostState.showSnackbar("Friend name is required for split expenses") }
                     return@Button
                 }
 
-                // Snippet functionality: Look up friend's uid
                 val friendEntity = viewModel.friends.value.find { f ->
                     f.nickname.equals(friendName.trim(), ignoreCase = true) ||
                     f.username?.equals(friendName.trim(), ignoreCase = true) == true
                 }
 
-                // ========== SAVE TRANSACTION ==========
-                
-                // Auto-populate note based on who paid for splits
                 val autoNote = if (isSplit) {
                     if (!youPaid) {
                         "${friendName.trim()} paid ${totalAmtVal.toInt()} and split with you"
@@ -722,19 +533,19 @@ fun AddTransactionScreen(
 
                 val tx = TransactionEntity(
                     id = editingTransaction?.id ?: UUID.randomUUID().toString(),
-                    amount = totalAmtVal,                      // ✅ ALWAYS Total amount
+                    amount = totalAmtVal,                      
                     type = type,
                     categoryId = categoryId,
                     subCategoryId = subCategoryId,
                     accountId = if (isSplit && !youPaid) null else accountId,
                     toAccountId = toAccountId,
                     isSplit = isSplit,
-                    splitAmount = if (isSplit) computedSplitAmt else 0.0, // ✅ FRIEND'S share
+                    splitAmount = if (isSplit) computedSplitAmt else 0.0, 
                     splitType = if (isSplit) splitType else null,
                     splitRatio = if (isSplit) splitRatio else null,
                     friendName = friendName.trim().toSentenceCase().ifBlank { null },
                     friendUid = friendEntity?.uid,
-                    friendPaid = isSplit && !youPaid,           // ✅ Whether friend paid
+                    friendPaid = isSplit && !youPaid,           
                     note = finalNote,
                     spentAt = spentAt,
                     createdAt = editingTransaction?.createdAt ?: System.currentTimeMillis(),
@@ -753,7 +564,6 @@ fun AddTransactionScreen(
         Spacer(Modifier.height(120.dp))
     }
 
-    // Original Sheets and Dialogs logic
     if (showCategorySheet) {
         CategoryGridSelector(
             viewModel = viewModel,
@@ -788,8 +598,6 @@ fun AddTransactionScreen(
         AccountDialog(onDismiss = { showAddAccountDialog = false }, onConfirm = { n, b, t -> viewModel.addAccount(n, b, t); showAddAccountDialog = false })
     }
 }
-
-// ── Helper composable: section card (theme-aware, premium feel) ──
 
 @Composable
 private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {

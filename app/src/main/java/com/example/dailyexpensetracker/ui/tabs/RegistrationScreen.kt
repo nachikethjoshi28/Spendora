@@ -1,4 +1,4 @@
-package com.example.dailyexpensetracker.ui.screens
+package com.example.dailyexpensetracker.ui.tabs
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
@@ -39,7 +39,6 @@ fun RegistrationScreen(
     val scope = rememberCoroutineScope()
     val calendar = Calendar.getInstance().apply { timeInMillis = dob }
 
-    // Validation: Alpha-numeric, > 4 letters (relaxed from 6 for better UX)
     val isValidUsername = remember(username) {
         username.length >= 4 && username.all { it.isLetterOrDigit() }
     }

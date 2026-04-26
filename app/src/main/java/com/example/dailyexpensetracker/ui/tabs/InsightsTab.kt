@@ -1,8 +1,7 @@
-package com.example.dailyexpensetracker.ui.screens.tabs
+package com.example.dailyexpensetracker.ui.tabs
 
 import android.app.DatePickerDialog
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -23,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.dailyexpensetracker.ui.screens.*
+import com.example.dailyexpensetracker.ui.components.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
 import java.text.SimpleDateFormat
@@ -33,11 +32,9 @@ import kotlin.math.abs
 @Composable
 fun InsightsTab(viewModel: ExpenseViewModel) {
     val transactions by viewModel.transactions.collectAsState()
-    val categories by viewModel.categories.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
     val context = LocalContext.current
 
-    // ── Filter state ──────────────────────────────────────────────────────────
     var selectedTimeFilter by remember { mutableStateOf(TimeFilter.LAST_MONTH) }
     var showFilterMenu by remember { mutableStateOf(false) }
     var tempStartDate by remember { mutableLongStateOf(0L) }
@@ -45,12 +42,10 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     var appliedStartDate by remember { mutableLongStateOf(0L) }
     var appliedEndDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    // ── Line chart toggles ────────────────────────────────────────────────────
     var showIncomeLine by remember { mutableStateOf(true) }
     var showExpenseLine by remember { mutableStateOf(true) }
     var showSavingsLine by remember { mutableStateOf(true) }
 
-    // ── Filtered transactions ─────────────────────────────────────────────────
     val activeTx = remember(transactions, selectedTimeFilter, appliedStartDate, appliedEndDate) {
         val now = System.currentTimeMillis()
         val start = when (selectedTimeFilter) {
@@ -64,7 +59,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
         transactions.filter { it.status != "DELETED" && it.spentAt in start..end }
     }
 
-    // ── Derived data ──────────────────────────────────────────────────────────
     val totalIncome = remember(activeTx) {
         activeTx.filter { it.type in listOf("SALARY", "RECEIVED", "GIFT", "REPAID") }.sumOf { it.amount }
     }
@@ -77,7 +71,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
     val savings = totalIncome - totalExpense
     val savingsRate = if (totalIncome > 0) (savings / totalIncome).toFloat() else 0f
 
-    // Updated grouping logic to use "categoryId" (the primary Category name)
     val expensePieData = remember(activeTx) {
         activeTx.filter { it.type in listOf("EXPENSE", "OTHER") }
             .groupBy { it.categoryId ?: "Miscellaneous" }
@@ -136,7 +129,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
     ) {
-        // ── Hero Header ───────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -168,7 +160,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                         )
                     }
 
-                    // Filter button
                     Box {
                         Surface(
                             onClick = { showFilterMenu = true },
@@ -216,7 +207,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                     }
                 }
 
-                // Custom date range picker
                 AnimatedVisibility(
                     visible = selectedTimeFilter == TimeFilter.CUSTOM,
                     enter = fadeIn() + expandVertically(),
@@ -280,8 +270,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
         }
 
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-
-            // ── Summary KPI strip ─────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -311,7 +299,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Health Score Card (premium gradient) ───────────────────────
             val healthAccent = when {
                 savingsRate >= 0.3f -> ThemeIncome
                 savingsRate >= 0.1f -> Color(0xFFFFD60A)
@@ -389,7 +376,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Spending Distribution Pie ─────────────────────────────────────
             InsightSection(title = "Spending by Category", subtitle = "${expensePieData.size} categories") {
                 if (expensePieData.isEmpty()) {
                     EmptyState("No expense data", "Add some expenses to see your spending breakdown")
@@ -404,7 +390,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Top categories horizontal bars ────────────────────────────────
             if (topCategories.isNotEmpty()) {
                 InsightSection(title = "Top Expense Categories") {
                     val maxCatAmount = topCategories.maxOfOrNull { it.value } ?: 1.0
@@ -422,7 +407,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                 Spacer(Modifier.height(16.dp))
             }
 
-            // ── Savings Rate Ring card ────────────────────────────────────────
             InsightSection(title = "Savings Rate") {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -452,7 +436,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Trends Line Graph ─────────────────────────────────────────────
             InsightSection(title = "Trends") {
                 Row(
                     modifier = Modifier.padding(bottom = 12.dp),
@@ -477,7 +460,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Monthly Bar Chart ─────────────────────────────────────────────
             InsightSection(
                 title = "Monthly Overview",
                 subtitle = "Expense · Income · Savings"
@@ -502,7 +484,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Friend Balances ────────────────────────────────────
             InsightSection(
                 title = "Friend Balances",
                 subtitle = if (totalToReceive > 0 || totalToRepay > 0)
@@ -513,7 +494,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                     EmptyState("No friend balances", "Lend or borrow to see balances here")
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // To Receive
                         if (receivePieData.isNotEmpty()) {
                             Column {
                                 Row(
@@ -542,7 +522,6 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                         }
 
-                        // To Repay
                         if (repayPieData.isNotEmpty()) {
                             Column {
                                 Row(

@@ -1,4 +1,4 @@
-package com.example.dailyexpensetracker.ui.screens
+package com.example.dailyexpensetracker.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -51,8 +50,6 @@ val RedShades = listOf(
     Color(0xFFFF9D96), Color(0xFFFFC0BB)
 )
 
-// ─── Donut Pie Chart (replaces flat arc pie) ──────────────────────────────────
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun InteractivePieChart(
@@ -83,7 +80,6 @@ fun InteractivePieChart(
         }
     }
 
-    // Animate draw progress
     val animProgress by animateFloatAsState(
         targetValue = 1f,
         animationSpec = tween(900, easing = FastOutSlowInEasing),
@@ -116,7 +112,7 @@ fun InteractivePieChart(
                         drawArc(
                             color = colors[index],
                             startAngle = startAngle,
-                            sweepAngle = sweepAngle - 1.5f, // gap between segments
+                            sweepAngle = sweepAngle - 1.5f,
                             useCenter = false,
                             style = Stroke(width = strokeWidth + extraStroke, cap = StrokeCap.Butt),
                             topLeft = Offset(center.x - radius, center.y - radius),
@@ -183,8 +179,6 @@ fun InteractivePieChart(
     }
 }
 
-// ─── Animated Line Graph ──────────────────────────────────────────────────────
-
 @Composable
 fun LineGraph(
     data: List<MonthlyData>,
@@ -236,7 +230,6 @@ fun LineGraph(
             val height = size.height
             val spacing = if (data.size > 1) width / (data.size - 1) else width
 
-            // Grid lines
             val steps = 4
             for (i in 0..steps) {
                 val y = height - (height / steps * i)
@@ -256,7 +249,6 @@ fun LineGraph(
                         fillPath.moveTo(x, height)
                         fillPath.lineTo(x, y)
                     } else {
-                        // Smooth bezier
                         val prevX = (i - 1) * spacing
                         val prevY = height - (points[i - 1].toFloat() / maxVal * height).coerceIn(0f, height)
                         val cp1x = prevX + spacing / 3
@@ -275,7 +267,6 @@ fun LineGraph(
 
                 drawPath(path, color, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
 
-                // Dots only at visible count boundary
                 val dotX = (drawCount - 1) * spacing
                 val dotY = height - (points[drawCount - 1].toFloat() / maxVal * height).coerceIn(0f, height)
                 drawCircle(color, 4.dp.toPx(), Offset(dotX, dotY))
@@ -288,8 +279,6 @@ fun LineGraph(
         }
     }
 }
-
-// ─── Grouped Bar Chart ────────────────────────────────────────────────────────
 
 @Composable
 fun IncomeExpenseBarChart(data: List<MonthlyData>, modifier: Modifier = Modifier) {
@@ -384,8 +373,6 @@ fun IncomeExpenseBarChart(data: List<MonthlyData>, modifier: Modifier = Modifier
     }
 }
 
-// ─── Horizontal Progress Bar (for top categories) ────────────────────────────
-
 @Composable
 fun HorizontalCategoryBar(
     name: String,
@@ -430,8 +417,6 @@ fun HorizontalCategoryBar(
     }
 }
 
-// ─── Radial Balance Gauge (net worth indicator) ───────────────────────────────
-
 @Composable
 fun RadialBalanceGauge(
     income: Double,
@@ -450,7 +435,6 @@ fun RadialBalanceGauge(
         val radius = (size.minDimension - strokeWidth) / 2
         val center = Offset(size.width / 2, size.height / 2)
 
-        // Background arc (half circle)
         drawArc(
             color = Color.White.copy(0.08f),
             startAngle = 180f,
@@ -461,7 +445,6 @@ fun RadialBalanceGauge(
             size = Size(radius * 2, radius * 2)
         )
 
-        // Expense arc (red, left half)
         val expenseSweep = (1f - animRatio) * 180f
         if (expenseSweep > 0f) {
             drawArc(
@@ -475,7 +458,6 @@ fun RadialBalanceGauge(
             )
         }
 
-        // Income arc (green, right half)
         val incomeSweep = animRatio * 180f
         if (incomeSweep > 0f) {
             drawArc(
@@ -489,7 +471,6 @@ fun RadialBalanceGauge(
             )
         }
 
-        // Needle
         val needleAngle = 180f + animRatio * 180f
         val needleRad = Math.toRadians(needleAngle.toDouble())
         val needleLen = radius - strokeWidth / 2 - 4.dp.toPx()
@@ -501,8 +482,6 @@ fun RadialBalanceGauge(
         drawCircle(Color.White, 5.dp.toPx(), center)
     }
 }
-
-// ─── Savings Rate Ring ────────────────────────────────────────────────────────
 
 @Composable
 fun SavingsRateRing(savingsRate: Float, modifier: Modifier = Modifier) {
@@ -543,8 +522,6 @@ fun SavingsRateRing(savingsRate: Float, modifier: Modifier = Modifier) {
         )
     }
 }
-
-// ─── Data models ──────────────────────────────────────────────────────────────
 
 data class MonthlyData(
     val month: String,
