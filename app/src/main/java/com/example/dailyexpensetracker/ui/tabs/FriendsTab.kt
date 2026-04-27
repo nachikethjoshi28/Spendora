@@ -1,3 +1,18 @@
+/**
+ * FriendsTab.kt
+ *
+ * Displays a list of friends with their current net balance (positive = they owe you,
+ * negative = you owe them).  Tapping a friend opens [FriendDetailView] showing all
+ * transactions involving that friend.
+ *
+ * ── Balance formula (mirrors ExpenseViewModel.friendBalances) ──────────��─────────
+ *  LENT    → +amount   (friend owes me)
+ *  BORROWED → -amount  (I owe friend)
+ *  RECEIVED → -amount  (friend paid me back → their debt reduces)
+ *  REPAID   → +amount  (I paid back → MY debt reduces)
+ *  EXPENSE split, I paid   → +splitAmount           (friend owes their share)
+ *  EXPENSE split, friend paid → -(amount–splitAmount) (I owe my share)
+ */
 package com.example.dailyexpensetracker.ui.tabs
 
 import androidx.activity.compose.BackHandler
@@ -36,12 +51,19 @@ import com.example.dailyexpensetracker.utils.toSentenceCase
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+/**
+ * FriendsTab – root composable for the Friends screen.
+ *
+ * Shows a summary of per-friend balances.  Tapping a friend card navigates to
+ * [FriendDetailView] which lists every transaction associated with that friend.
+ * The FAB expands to reveal "Add Friend" and "Create Group" actions.
+ */
 @Composable
 fun FriendsTab(viewModel: ExpenseViewModel, onEditTransaction: (TransactionEntity) -> Unit) {
     val friendBalances by viewModel.friendBalances.collectAsState()
-    val friends by viewModel.friends.collectAsState()
-    val accounts by viewModel.accounts.collectAsState()
-    val accountMap = accounts.associateBy { it.id }
+    val friends        by viewModel.friends.collectAsState()
+    val accounts       by viewModel.accounts.collectAsState()
+    val accountMap     = accounts.associateBy { it.id }
 
     var selectedFriend by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
@@ -269,6 +291,12 @@ private fun NetCard(label: String, amount: Double, color: Color, modifier: Modif
     }
 }
 
+/**
+ * AddFriendDialog – lets the user search for a registered user by email/phone and
+ * add them as a friend.  If the search finds a registered user, their username is
+ * pre-filled as the nickname.  The friend is stored in Firestore under the current
+ * user's "friends" sub-collection.
+ */
 @Composable
 fun AddFriendDialog(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
     var contact by remember { mutableStateOf("") }
@@ -385,6 +413,13 @@ private fun GroupComingSoonDialog(onDismiss: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface, titleContentColor = MaterialTheme.colorScheme.onSurface, title = { Text("Groups", fontWeight = FontWeight.Bold) }, text = { Text("Group expense splitting is coming soon!", color = Color.Gray) }, confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = FintechAccent) } } )
 }
 
+/**
+ * FriendDetailView – drill-down screen for a single friend.
+ *
+ * Shows the running balance with this friend and a chronological list of every
+ * transaction that references [friendName] (case-insensitive).  Long-pressing a
+ * transaction opens an edit/delete dialog.
+ */
 @Composable
 fun FriendDetailView(friendName: String, viewModel: ExpenseViewModel, accountMap: Map<String, AccountEntity>, onBack: () -> Unit, onEditTransaction: (TransactionEntity) -> Unit) {
     val transactions by viewModel.transactionsWithHistory.collectAsState()
@@ -439,5 +474,5 @@ fun FabMenuItem(icon: ImageVector, label: String, onClick: () -> Unit) {
     }
 }
 
-@Composable
-fun FriendHistoryView(friendName: String, viewModel: ExpenseViewModel, accountMap: Map<String, AccountEntity>, onBack: () -> Unit, onEditTransaction: (TransactionEntity) -> Unit) = FriendDetailView(friendName, viewModel, accountMap, onBack, onEditTransaction)
+// FriendHistoryView removed – it was a single-line alias for FriendDetailView with no
+// additional logic and was never called from anywhere.  Use FriendDetailView directly.

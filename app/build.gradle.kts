@@ -103,3 +103,20 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+tasks.register("fixLogo") {
+    doLast {
+        val imagesDir = file("../images")
+        val resDir = file("src/main/res/drawable")
+        
+        // Delete any potentially broken files
+        file("src/main/res/drawable/app_logo.png").delete()
+        file("src/main/res/drawable/app_logo.jpg").delete()
+        
+        copy {
+            from(file("../images/logo.jpg"))
+            into("src/main/res/drawable")
+            rename { "app_logo.jpg" }
+        }
+    }
+}

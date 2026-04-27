@@ -1,3 +1,14 @@
+/**
+ * InsightsTab.kt
+ *
+ * Analytics tab showing time-filtered charts and breakdowns.
+ *
+ * Income formula (must stay consistent with HomeTab):
+ *   SALARY + RECEIVED + BORROWED + GIFT + INCOME
+ *
+ * Expense formula:
+ *   EXPENSE (user's share) + OTHER + LENT + REPAID
+ */
 package com.example.dailyexpensetracker.ui.tabs
 
 import android.app.DatePickerDialog
@@ -59,8 +70,12 @@ fun InsightsTab(viewModel: ExpenseViewModel) {
         transactions.filter { it.status != "DELETED" && it.spentAt in start..end }
     }
 
+    // Income = cash inflows. REPAID is an outflow (you paid back a debt), NOT income.
+    // BORROWED is an inflow (friend lent you money), matches HomeTab formula.
+    // BUG FIX: previously included REPAID (wrong) and excluded BORROWED (inconsistent).
     val totalIncome = remember(activeTx) {
-        activeTx.filter { it.type in listOf("SALARY", "RECEIVED", "GIFT", "REPAID") }.sumOf { it.amount }
+        activeTx.filter { it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME") }
+            .sumOf { it.amount }
     }
 
     val totalExpense = remember(activeTx) {

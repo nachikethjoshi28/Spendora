@@ -72,8 +72,12 @@ suspend fun generateCombinedPdf(
         addBrandBanner(doc, parsePeriodFromFileName(fileName, transactions))
 
         // ── 2. Aggregates ────────────────────────────────────────────────────
+        // Income = cash inflows, matching HomeTab/InsightsTab formula.
+        // REPAID is an OUTFLOW (debt repayment) – must NOT appear in income.
+        // BORROWED is an inflow – included for consistency with the rest of the app.
+        // BUG FIX: was listOf("SALARY","RECEIVED","GIFT","REPAID") – REPAID wrong, BORROWED missing.
         val income = transactions
-            .filter { it.type in listOf("SALARY", "RECEIVED", "GIFT", "REPAID") }
+            .filter { it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME") }
             .sumOf { it.amount }
         val expense = transactions
             .filter { it.type in listOf("EXPENSE", "OTHER") }
@@ -392,7 +396,8 @@ private fun addAccountBreakdown(
     val rows = accountMap.entries.mapNotNull { (id, name) ->
         val accTx = transactions.filter { it.accountId == id || it.toAccountId == id }
         if (accTx.isEmpty()) return@mapNotNull null
-        val acIn = accTx.filter { it.type in listOf("SALARY", "RECEIVED", "GIFT", "REPAID") }.sumOf { it.amount } +
+        // Account-level inflows: same formula as global income (REPAID removed, BORROWED added)
+        val acIn = accTx.filter { it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME") }.sumOf { it.amount } +
                 accTx.filter { it.type == "SELF_TRANSFER" && it.toAccountId == id }.sumOf { it.amount }
         val acOut = accTx.filter { it.type in listOf("EXPENSE", "OTHER") && it.accountId == id }
             .sumOf { if (it.isSplit) it.amount - it.splitAmount else it.amount } +
@@ -479,7 +484,9 @@ private fun addTransactionTable(
 
     transactions.forEachIndexed { i, tx ->
         val rowBg = if (i % 2 == 0) PageWhite else ZebraRow
-        val isIncome = tx.type in listOf("SALARY", "RECEIVED", "GIFT", "REPAID")
+        // REPAID is an outflow (shown in red/expense). BORROWED is an inflow (shown in green).
+        // BUG FIX: was including REPAID in isIncome (coloured it green incorrectly).
+        val isIncome = tx.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME")
         val isTransfer = tx.type in listOf("SELF_TRANSFER", "BILL PAYMENT", "LOAD GIFT CARD")
 
         fun bodyCell(text: String, f: Font, align: Int = Element.ALIGN_LEFT): PdfPCell {

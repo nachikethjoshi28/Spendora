@@ -1,3 +1,22 @@
+/**
+ * CommonComponents.kt
+ *
+ * Shared, reusable Compose components used across multiple tabs.
+ *
+ * Contents:
+ *  - [TransactionItem]         – card showing one transaction; expands on tap for details
+ *  - [MiniFlowCard]            – compact income/expense/dues chip for the HomeTab hero row
+ *  - [SectionCard]             – themed card wrapper used in Add/Edit transaction form
+ *  - [SectionHeader]           – bold section-title text
+ *  - [FintechInput]            – styled OutlinedTextField
+ *  - [FintechChoiceChip]       – toggle-style choice chip
+ *  - [FintechDropdown]         – read-only dropdown backed by OutlinedTextField + DropdownMenu
+ *  - [FintechAutocompleteInput]– text field with live-filtered suggestion popup
+ *  - [CategoryGridSelector]    – ModalBottomSheet grid for choosing (or adding) a category
+ *  - [SubCategoryGridSelector] – ModalBottomSheet grid for choosing (or adding) a sub-category
+ *  - [AccountDialog]           – dialog for adding / editing an account
+ *  - [DetailRow]               – label + value row used in the expanded transaction detail panel
+ */
 package com.example.dailyexpensetracker.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -106,6 +125,18 @@ val investmentPortfolios = listOf(
     BankInfo("Kraken", "kraken.com", Icons.Default.CurrencyBitcoin)
 )
 
+/**
+ * TransactionItem – single-row card representing one [TransactionEntity].
+ *
+ * Tap  → expands to show full details (date, category, account, split info, note).
+ * Long-press → triggers [onLongClick] (host shows edit/delete dialog).
+ *
+ * The displayed amount is always the USER's share:
+ *   userShare = if (isSplit) amount – splitAmount else amount
+ *
+ * Transfer types (SELF_TRANSFER, BILL PAYMENT, LOAD GIFT CARD) show no sign prefix
+ * and use cyan colour to distinguish them from income/expense.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransactionItem(
@@ -404,6 +435,16 @@ fun FintechAutocompleteInput(value: String, suggestions: List<String>, onValueCh
     }
 }
 
+/**
+ * CategoryGridSelector – ModalBottomSheet showing categories in a 3-column grid.
+ *
+ * The "+" icon button in the title row opens an inline dialog where the user can
+ * type a name to create a new category (saved to Firestore via [viewModel.addCategory]).
+ * Because [categories] is driven by [viewModel.categories] (a live StateFlow), the
+ * newly created category appears in the grid immediately without recomposition tricks.
+ *
+ * @param categories Live list from [ExpenseViewModel.categories] – NOT a hardcoded list.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryGridSelector(
@@ -502,6 +543,16 @@ fun CategoryGridSelector(
     }
 }
 
+/**
+ * SubCategoryGridSelector – ModalBottomSheet for picking (or creating) a sub-category
+ * that belongs to a parent [categoryId].
+ *
+ * Identical layout to [CategoryGridSelector].  The "+" button creates a new sub-category
+ * via [viewModel.addSubCategory], which is persisted to Firestore and flows back through
+ * [viewModel.allSubCategories].
+ *
+ * Sub-category is optional for most categories but REQUIRED when category == "Miscellaneous".
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubCategoryGridSelector(

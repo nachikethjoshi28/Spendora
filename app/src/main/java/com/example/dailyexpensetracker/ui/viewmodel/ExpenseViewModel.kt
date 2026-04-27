@@ -1,3 +1,32 @@
+/**
+ * ExpenseViewModel.kt
+ *
+ * Single shared ViewModel for the entire app.  Exposes StateFlow streams that
+ * the Compose UI collects, and delegates all persistence to [ExpenseRepository].
+ *
+ * ── Transaction type semantics ───────────────────────────────────────────────────
+ *  SALARY / GIFT / INCOME  – earned inflow (shown as income)
+ *  RECEIVED                – friend paid you back their debt (inflow)
+ *  BORROWED                – friend lent you money (inflow, but creates a liability)
+ *  EXPENSE                 – regular spending (outflow; user's share = amount – splitAmount for splits)
+ *  OTHER                   – misc spending (outflow)
+ *  LENT                    – money given to a friend (outflow; creates a receivable)
+ *  REPAID                  – you paid back a debt you owed a friend (outflow)
+ *  BILL PAYMENT            – transfer: paying a credit-card bill from a bank account
+ *  LOAD GIFT CARD          – transfer: loading a gift-card balance
+ *  SELF_TRANSFER           – internal transfer between own accounts
+ *
+ * ── Friend balance formula ───────────────────────────────────────────────────────
+ *  +amount  → friend owes ME
+ *  -amount  → I owe friend
+ *
+ *  LENT    → +amount  (friend owes me the lent amount)
+ *  BORROWED → -amount  (I owe friend the borrowed amount)
+ *  RECEIVED → -amount  (friend paid me back → their debt reduces)
+ *  REPAID   → +amount  (I paid friend back → MY debt reduces → balance rises toward 0)
+ *  EXPENSE split, I paid   → +splitAmount          (friend owes me their share)
+ *  EXPENSE split, friend paid → -(amount–splitAmount) (I owe friend my share)
+ */
 package com.example.dailyexpensetracker.ui.viewmodel
 
 import android.util.Log
@@ -126,22 +155,36 @@ class ExpenseViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * Per-friend balance map.
+     *
+     * Groups all non-deleted transactions that carry a [friendName] and computes a
+     * signed running balance for each friend (case-insensitive key).
+     *
+     * Positive balance  → that friend owes ME money.
+     * Negative balance  → I owe that friend money.
+     */
     val friendBalances: StateFlow<List<FriendBalance>> = transactions.map { list ->
         list.filter { it.status != "DELETED" && !it.friendName.isNullOrBlank() }
-            .groupBy { it.friendName!!.trim().lowercase() }
-            .map { (lowerName, txs) ->
+            .groupBy { it.friendName!!.trim().lowercase() }   // group case-insensitively
+            .map { (_, txs) ->
                 val displayName = txs.first().friendName!!.trim()
-                val balance = txs.sumOf {
-                    when (it.type) {
-                        "LENT" -> it.amount
-                        "BORROWED" -> -it.amount
-                        "RECEIVED" -> -it.amount
-                        "REPAID" -> -it.amount
-                        "EXPENSE" -> {
-                            if (it.isSplit) {
-                                // amount is total, splitAmount is friend's share
-                                if (it.friendPaid) -(it.amount - it.splitAmount) // I owe them my share
-                                else it.splitAmount // They owe me their share
+                val balance = txs.sumOf { tx ->
+                    when (tx.type) {
+                        // I lent money → friend owes me → positive
+                        "LENT"     -> tx.amount
+                        // Friend lent me money → I owe friend → negative
+                        "BORROWED" -> -tx.amount
+                        // Friend paid me back → their debt clears → negative contribution
+                        "RECEIVED" -> -tx.amount
+                        // I paid friend back → MY debt clears → positive contribution
+                        // BUG FIX: was -tx.amount (balance went MORE negative after repaying!)
+                        "REPAID"   -> +tx.amount
+                        "EXPENSE"  -> {
+                            if (tx.isSplit) {
+                                // tx.amount = total bill, tx.splitAmount = friend's share
+                                if (tx.friendPaid) -(tx.amount - tx.splitAmount) // I owe friend my share
+                                else tx.splitAmount                               // Friend owes me their share
                             } else 0.0
                         }
                         else -> 0.0
@@ -168,39 +211,44 @@ class ExpenseViewModel(
                 cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear
             }
 
-            // Inflows: Salary, Received, Borrowed, Gift
-            // + My share of a split expense where friend paid (effectively a virtual loan)
+            // Current-month inflows.
+            // BORROWED is counted as income because it increases liquid cash, even though it
+            // creates a future liability (tracked separately in dues).
+            // A split EXPENSE where the friend paid means the friend effectively covered
+            // our share as a short-term loan – counted as income to balance the outflow side.
             val income = currentMonthTransactions.sumOf {
                 when {
                     it.type in listOf("SALARY", "RECEIVED", "BORROWED", "GIFT", "INCOME") -> it.amount
+                    // Friend paid the full bill; our share is an inflow (they're covering us)
                     it.type == "EXPENSE" && it.isSplit && it.friendPaid -> (it.amount - it.splitAmount)
                     else -> 0.0
                 }
             }
 
-            // Outflows: Expenses (user part), Lent money, Repaid debt
-            // Note: For split EXPENSE transactions, user's share is (amount - splitAmount)
+            // Current-month outflows.
+            // For split EXPENSE, only the user's portion (amount – splitAmount) is an outflow.
+            // LENT and REPAID are both outflows (cash leaves the user's pocket).
             val expense = currentMonthTransactions.sumOf {
                 when {
-                    it.type in listOf("EXPENSE", "OTHER") -> {
+                    it.type in listOf("EXPENSE", "OTHER") ->
                         if (it.isSplit) (it.amount - it.splitAmount) else it.amount
-                    }
                     it.type in listOf("LENT", "REPAID") -> it.amount
                     else -> 0.0
                 }
             }
 
-            // ✅ Net Dues (what others owe me minus what I owe others)
+            // Net dues: positive = others owe me, negative = I owe others (all-time, not month-filtered)
             val dues = activeTxs.sumOf {
                 when (it.type) {
-                    "LENT" -> it.amount
-                    "BORROWED" -> -it.amount
-                    "RECEIVED" -> -it.amount
-                    "REPAID" -> -it.amount
-                    "EXPENSE" -> {
+                    "LENT"     -> it.amount          // friend owes me → +
+                    "BORROWED" -> -it.amount         // I owe friend → -
+                    "RECEIVED" -> -it.amount         // friend paid back → their debt reduces → -
+                    // BUG FIX: was -it.amount; repaying reduces MY debt so dues must rise (+)
+                    "REPAID"   -> +it.amount
+                    "EXPENSE"  -> {
                         if (it.isSplit) {
-                            if (it.friendPaid) -(it.amount - it.splitAmount) // I owe them my share
-                            else it.splitAmount // They owe me their share
+                            if (it.friendPaid) -(it.amount - it.splitAmount) // I owe friend my share
+                            else it.splitAmount                               // Friend owes me their share
                         } else 0.0
                     }
                     else -> 0.0

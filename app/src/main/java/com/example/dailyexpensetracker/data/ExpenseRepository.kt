@@ -1,3 +1,24 @@
+/**
+ * ExpenseRepository.kt
+ *
+ * Single source of truth for all data access.  Bridges Firestore (remote) with
+ * Room (local cache) and exposes Kotlin Flow/suspend functions to the ViewModel.
+ *
+ * ── Data flow ────────────────────────────────────────────────────────────────────
+ *  All reads  → Firestore real-time listeners (callbackFlow); results cached to Room.
+ *  All writes → Firestore first; Room updated reactively via the listener.
+ *
+ * ── Account balance update rules ─────────────────────────────────────────────────
+ *  SALARY / RECEIVED / BORROWED / GIFT → +amount  (inflow)
+ *  EXPENSE / LENT / REPAID / OTHER     → -amount  (outflow)
+ *  BILL PAYMENT / LOAD GIFT CARD / SELF_TRANSFER → debit fromAccount, credit toAccount
+ *  Split EXPENSE where friendPaid      → no balance impact (friend covered the bill)
+ *
+ * ── Friend sync ──────────────────────────────────────────────────────────────────
+ *  When a transaction has a [friendUid], a mirror transaction is written to that
+ *  friend's Firestore document with the type inverted (LENT↔BORROWED, REPAID↔RECEIVED).
+ *  Deleting a transaction also marks the friend's mirror as DELETED.
+ */
 package com.example.dailyexpensetracker.data
 
 import android.util.Log

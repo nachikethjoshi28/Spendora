@@ -1,3 +1,27 @@
+/**
+ * AddTransactionTab.kt
+ *
+ * Full-screen form for creating and editing transactions.
+ *
+ * ── Transaction type hierarchy ────────────────────────────────────��──────────────
+ *  Main type "Spent"         → sub-types: EXPENSE, REPAID, OTHER
+ *  Main type "Received"      → sub-types: SALARY, RECEIVED, GIFT
+ *  Main type "Card Payment"  → sub-types: "BILL PAYMENT", "LOAD GIFT CARD"
+ *                              (Note: stored with a space, NOT an underscore)
+ *  Main type "Debts & Loans" → sub-types: LENT, BORROWED
+ *
+ * ── Split expense semantics ──────────────────────────────────────────────────────
+ *  amount      = total bill
+ *  splitAmount = friend's portion  (computed from splitType/splitRatio)
+ *  userShare   = amount – splitAmount
+ *
+ *  friendPaid = true  → friend paid the full bill; I owe friend my share
+ *  friendPaid = false → I paid the full bill; friend owes me their share
+ *
+ * ── Category requirement ─────────────────────────────────────────────────────────
+ *  Category is required for EXPENSE type.
+ *  Sub-category is required only when category == "Miscellaneous".
+ */
 package com.example.dailyexpensetracker.ui.tabs
 
 import android.app.DatePickerDialog
@@ -23,7 +47,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dailyexpensetracker.data.local.TransactionEntity
-import com.example.dailyexpensetracker.data.local.CategoryEntity
+// CategoryEntity import removed – categories now come from viewModel.categories (no hardcoded list)
 import com.example.dailyexpensetracker.ui.components.*
 import com.example.dailyexpensetracker.ui.theme.*
 import com.example.dailyexpensetracker.ui.viewmodel.ExpenseViewModel
@@ -72,30 +96,33 @@ fun AddTransactionScreen(
     }
     var youPaid by remember(editingTransaction) { mutableStateOf(editingTransaction?.friendPaid?.not() ?: true) }
 
-    val accounts by viewModel.accounts.collectAsState()
+    val accounts       by viewModel.accounts.collectAsState()
     val friendBalances by viewModel.friendBalances.collectAsState()
-    val friends by viewModel.friends.collectAsState()
+    val friends        by viewModel.friends.collectAsState()
 
+    // Autocomplete suggestions for the "friend name" field: pull from both the
+    // Friends table and from historical transaction friendName values.
     val friendSuggestions = remember(friends, friendBalances) {
         val fromFriends = friends.map { it.nickname }
         val fromHistory = friendBalances.map { it.friendName }
         (fromFriends + fromHistory).distinct().sorted()
     }
-    
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+
+    val scope    = rememberCoroutineScope()
+    val context  = LocalContext.current
     val calendar = Calendar.getInstance().apply { timeInMillis = spentAt }
-    
-    var showAddAccountDialog by remember { mutableStateOf(false) }
-    var showCategorySheet by remember { mutableStateOf(false) }
-    var showSubCategorySheet by remember { mutableStateOf(false) }
 
-    val expenseSubCategories = listOf(
-        "Housing", "Utilities", "Groceries", "Govt Services", "Dining Out",
-        "Entertainment", "Healthcare", "Shopping", "Education", "Connectivity",
-        "Fitness", "Subscriptions", "Travel", "Gifts", "Miscellaneous"
-    ).map { CategoryEntity(id = it, name = it) }
+    var showAddAccountDialog  by remember { mutableStateOf(false) }
+    var showCategorySheet     by remember { mutableStateOf(false) }
+    var showSubCategorySheet  by remember { mutableStateOf(false) }
 
+    // Dynamic category list from Firestore / Room (includes user-created categories).
+    // BUG FIX: was a hardcoded list – newly added categories never appeared in the picker.
+    // The user can tap the "+" button in CategoryGridSelector to create new categories,
+    // which are saved to Firestore and flow back here via this StateFlow.
+    val dynamicCategories by viewModel.categories.collectAsState()
+
+    // Notify ViewModel which category is selected so it can load matching sub-categories
     LaunchedEffect(categoryId) {
         viewModel.selectCategory(categoryId)
     }
@@ -180,11 +207,15 @@ fun AddTransactionScreen(
                         onClick = {
                             mainType = mt
                             type = when (mt) {
-                                "Spent" -> "EXPENSE"
-                                "Received" -> "SALARY"
-                                "Card Payment" -> "BILL_PAYMENT"
+                                "Spent"         -> "EXPENSE"
+                                "Received"      -> "SALARY"
+                                // BUG FIX: was "BILL_PAYMENT" (underscore). Sub-type chips use
+                                // "BILL PAYMENT" (space), so neither chip was pre-selected and
+                                // the underscore variant wasn't recognised in account-balance
+                                // logic or TransactionItem. Must match sub-type strings exactly.
+                                "Card Payment"  -> "BILL PAYMENT"
                                 "Debts & Loans" -> "LENT"
-                                else -> "EXPENSE"
+                                else            -> "EXPENSE"
                             }
                             isSplit = false
                             categoryId = null
@@ -565,13 +596,16 @@ fun AddTransactionScreen(
     }
 
     if (showCategorySheet) {
+        // Pass dynamicCategories (from Firestore) so any category the user created via
+        // the "+" button is immediately visible here.
         CategoryGridSelector(
             viewModel = viewModel,
             title = "Select Category",
-            categories = expenseSubCategories,
-            onCategorySelected = { 
-                if (categoryId != it.id) subCategoryId = null
-                categoryId = it.id
+            categories = dynamicCategories,
+            onCategorySelected = { selected ->
+                // Reset sub-category when the parent category changes
+                if (categoryId != selected.id) subCategoryId = null
+                categoryId = selected.id
                 showCategorySheet = false
             },
             onDismiss = { showCategorySheet = false }
@@ -599,17 +633,6 @@ fun AddTransactionScreen(
     }
 }
 
-@Composable
-private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            content()
-        }
-    }
-}
+// SectionCard removed from this file – it was an exact duplicate of the public
+// SectionCard defined in CommonComponents.kt (imported via ui.components.*).
+// Using the shared version avoids keeping two identical composables in sync.
